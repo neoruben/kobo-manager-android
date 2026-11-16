@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Rakuten Kobo Inc. Vendor ID (0x2237 = 8759) -->
+    <usb-device vendor-id="8759" />
+    <!-- Cualquier unidad USB Mass Storage Bulk-Only Transport (Class 8, Subclass 6, Protocol 80) -->
+    <usb-device class="8" subclass="6" protocol="80" />
+</resources>
