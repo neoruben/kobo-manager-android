@@ -993,7 +993,7 @@ class KoboBackend(private val context: Context) {
         }
 
         fun scanDir(dirCluster: Long, dirPath: String, depth: Int) {
-            if (depth > 2) return
+            if (depth > 4) return
             val entries = try {
                 vol.listDirectory(dirCluster)
             } catch (_: Exception) {

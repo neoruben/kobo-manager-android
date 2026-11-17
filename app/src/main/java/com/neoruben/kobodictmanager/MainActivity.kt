@@ -750,8 +750,13 @@ fun KoboDictManagerSingleScreen(
                 itemsPerPage = booksPerPage,
                 onPageChange = { booksPage = it },
                 onDeleteBook = { book ->
+                    val bookPath = if (book.folderPath.isEmpty()) {
+                        "/${book.name}"
+                    } else {
+                        "/${book.folderPath.trim('/')}/${book.name}"
+                    }
                     confirmTitle = tr(lang, "confirm_delete_book_title")
-                    confirmMessage = tr(lang, "confirm_delete_book_msg", "name" to book.displayTitle)
+                    confirmMessage = "${tr(lang, "confirm_delete_book_msg", "name" to book.displayTitle)}\n\n📁 $bookPath"
                     confirmAction = {
                         scope.launch(Dispatchers.IO) {
                             try {
@@ -1677,7 +1682,10 @@ private fun KoboBooksLibraryCard(
         val q = searchQuery.trim().lowercase()
         if (q.isEmpty()) books
         else books.filter {
-            it.displayTitle.lowercase().contains(q) || it.author.lowercase().contains(q)
+            val path = if (it.folderPath.isEmpty()) "/${it.name}" else "/${it.folderPath}/${it.name}"
+            it.displayTitle.lowercase().contains(q) ||
+                it.author.lowercase().contains(q) ||
+                path.lowercase().contains(q)
         }
     }
 
@@ -1887,7 +1895,7 @@ private fun BookCompactCard(
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
                     text = book.displayTitle,
@@ -1907,6 +1915,18 @@ private fun BookCompactCard(
                     fontSize = 11.sp,
                     color = palette.textSecondary,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                val fullEreaderPath = if (book.folderPath.isEmpty()) {
+                    "/${book.name}"
+                } else {
+                    "/${book.folderPath.trim('/')}/${book.name}"
+                }
+                Text(
+                    text = "📁 $fullEreaderPath",
+                    fontSize = 10.sp,
+                    color = palette.textSecondary.copy(alpha = 0.8f),
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
