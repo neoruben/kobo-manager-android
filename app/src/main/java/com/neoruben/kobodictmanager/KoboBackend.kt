@@ -8,6 +8,7 @@ import android.hardware.usb.UsbManager
 import android.net.Uri
 import android.provider.OpenableColumns
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -17,6 +18,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.zip.ZipInputStream
+import javax.xml.parsers.DocumentBuilderFactory
 
 data class KoboDeviceInfo(
     val drive: String,
@@ -63,6 +65,8 @@ data class KoboDictFileItem(
 
 data class KoboBookItem(
     val name: String,
+    val displayTitle: String,
+    val author: String = "",
     val folderPath: String,
     val size: Long,
     val format: String
@@ -75,6 +79,7 @@ class KoboBackend(private val context: Context) {
     val backupsDir: File = File(dataDir, "backups").apply { mkdirs() }
     private val catalogFile: File = File(libraryDir, "catalog.json")
     private val settingsFile: File = File(dataDir, "settings.json")
+    private val kepubCacheFile: File = File(dataDir, "kepub_cache.json")
 
     private var activeBlockDevice: BlockDevice? = null
     private var activeVolume: Fat32Volume? = null
@@ -696,6 +701,81 @@ class KoboBackend(private val context: Context) {
         }
     }
 
+    private fun loadKepubCache(): JSONObject {
+        if (!kepubCacheFile.exists()) return JSONObject()
+        return try {
+            JSONObject(kepubCacheFile.readText(StandardCharsets.UTF_8))
+        } catch (_: Exception) {
+            JSONObject()
+        }
+    }
+
+    private fun saveKepubCache(cache: JSONObject) {
+        try {
+            kepubCacheFile.writeText(cache.toString(), StandardCharsets.UTF_8)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun parseEpubTitleAuthor(zipBytes: ByteArray): Pair<String, String>? {
+        return try {
+            var containerBytes: ByteArray? = null
+            val opfCandidates = LinkedHashMap<String, ByteArray>()
+
+            ZipInputStream(ByteArrayInputStream(zipBytes)).use { zis ->
+                while (true) {
+                    val entry = zis.nextEntry ?: break
+                    val lower = entry.name.lowercase()
+                    if (lower == "meta-inf/container.xml") {
+                        containerBytes = zis.readBytes()
+                    } else if (lower.endsWith(".opf")) {
+                        opfCandidates[entry.name] = zis.readBytes()
+                    }
+                    zis.closeEntry()
+                }
+            }
+
+            var targetOpfBytes: ByteArray? = null
+            if (containerBytes != null) {
+                val doc = DocumentBuilderFactory.newInstance().apply {
+                    isNamespaceAware = true
+                }.newDocumentBuilder().parse(ByteArrayInputStream(containerBytes))
+                val rootfiles = doc.getElementsByTagName("rootfile")
+                if (rootfiles.length > 0) {
+                    val fullPath = rootfiles.item(0).attributes?.getNamedItem("full-path")?.nodeValue
+                    if (!fullPath.isNullOrEmpty()) {
+                        targetOpfBytes = opfCandidates[fullPath]
+                            ?: opfCandidates.entries.firstOrNull { it.key.equals(fullPath, ignoreCase = true) }?.value
+                    }
+                }
+            }
+            if (targetOpfBytes == null) {
+                targetOpfBytes = opfCandidates.values.firstOrNull()
+            }
+            if (targetOpfBytes == null) return null
+
+            val opfDoc = DocumentBuilderFactory.newInstance().apply {
+                isNamespaceAware = true
+            }.newDocumentBuilder().parse(ByteArrayInputStream(targetOpfBytes))
+
+            fun firstTagText(localName: String): String {
+                val nodesNs = opfDoc.getElementsByTagNameNS("*", localName)
+                if (nodesNs.length > 0) return nodesNs.item(0).textContent?.trim().orEmpty()
+                val nodesDc = opfDoc.getElementsByTagName("dc:$localName")
+                if (nodesDc.length > 0) return nodesDc.item(0).textContent?.trim().orEmpty()
+                val nodesPlain = opfDoc.getElementsByTagName(localName)
+                if (nodesPlain.length > 0) return nodesPlain.item(0).textContent?.trim().orEmpty()
+                return ""
+            }
+
+            val title = firstTagText("title")
+            val author = firstTagText("creator")
+            if (title.isEmpty() && author.isEmpty()) null else Pair(title, author)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     @Synchronized
     fun listKoboBooks(): List<KoboBookItem> {
         val vol = activeVolume ?: return emptyList()
@@ -725,6 +805,8 @@ class KoboBackend(private val context: Context) {
                         result.add(
                             KoboBookItem(
                                 name = entry.name,
+                                displayTitle = entry.name,
+                                author = "",
                                 folderPath = dirPath,
                                 size = entry.size,
                                 format = fmt
@@ -735,8 +817,64 @@ class KoboBackend(private val context: Context) {
             }
         }
 
+        // 1. Escanear carpetas visibles del usuario (raíz, /Books, etc.)
         scanDir(vol.rootCluster, "", 0)
-        return result.sortedBy { it.name.lowercase() }
+
+        // 2. Escanear .kobo/kepub (libros descargados de Kobo Store / Kobo Cloud sin extensión)
+        val kepubDir = vol.findEntry(".kobo/kepub")
+        if (kepubDir != null && kepubDir.isDirectory) {
+            val kepubEntries = try {
+                vol.listDirectory(kepubDir.firstCluster)
+            } catch (_: Exception) {
+                emptyList()
+            }
+            val cache = loadKepubCache()
+            var cacheDirty = false
+
+            for (entry in kepubEntries) {
+                if (entry.isDirectory || entry.name.startsWith(".") || entry.size < 2048L) continue
+                val cacheKey = "${entry.name}_${entry.size}"
+                var title = ""
+                var author = ""
+                val cached = cache.optJSONObject(cacheKey)
+                if (cached != null) {
+                    title = cached.optString("title", "")
+                    author = cached.optString("author", "")
+                } else {
+                    try {
+                        val bytes = vol.readFileBytes(entry)
+                        val parsed = parseEpubTitleAuthor(bytes)
+                        if (parsed != null) {
+                            title = parsed.first
+                            author = parsed.second
+                            cache.put(cacheKey, JSONObject().apply {
+                                put("title", title)
+                                put("author", author)
+                            })
+                            cacheDirty = true
+                        }
+                    } catch (_: Exception) {
+                    }
+                }
+
+                result.add(
+                    KoboBookItem(
+                        name = entry.name,
+                        displayTitle = title.ifEmpty { entry.name },
+                        author = author,
+                        folderPath = ".kobo/kepub",
+                        size = entry.size,
+                        format = "KOBO"
+                    )
+                )
+            }
+
+            if (cacheDirty) {
+                saveKepubCache(cache)
+            }
+        }
+
+        return result.sortedBy { it.displayTitle.lowercase() }
     }
 
     @Synchronized
@@ -775,6 +913,8 @@ class KoboBackend(private val context: Context) {
 
             return KoboBookItem(
                 name = written.name,
+                displayTitle = written.name,
+                author = "",
                 folderPath = targetFolder,
                 size = written.size,
                 format = format

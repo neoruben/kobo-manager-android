@@ -2,7 +2,7 @@ package com.neoruben.kobodictmanager
 
 import java.util.Locale
 
-const val APP_VERSION = "1.2.0"
+const val APP_VERSION = "1.3.0"
 
 val OFFICIAL_FACTORY_SPECS = mapOf(
     "dicthtml-es.zip" to FactorySpec(

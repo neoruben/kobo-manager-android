@@ -606,9 +606,11 @@ fun KoboDictManagerSingleScreen(
         currentActiveHash == officialInfo.sha256
 
     val catalogList = remember(catalog) { catalog.values.toList() }
-    val totalPages = ((catalogList.size + itemsPerPage - 1) / itemsPerPage).coerceAtLeast(1)
+    // Lista unificada de diccionarios: Oficial de fábrica + añadidos (3 por página dentro del mismo cuadro)
+    val totalDictEntries = 1 + catalogList.size
+    val totalPages = ((totalDictEntries + itemsPerPage - 1) / itemsPerPage).coerceAtLeast(1)
     if (currentPage >= totalPages) currentPage = (totalPages - 1).coerceAtLeast(0)
-    val pageItems = catalogList.drop(currentPage * itemsPerPage).take(itemsPerPage)
+    val pageIndices = (0 until totalDictEntries).drop(currentPage * itemsPerPage).take(itemsPerPage)
 
     // =========================================================================
     // PANTALLA ÚNICA SIN SCROLL VERTICAL (100% ENCAJADA EN EL VIEWPORT)
@@ -656,7 +658,7 @@ fun KoboDictManagerSingleScreen(
                 pendingPermissionDevice?.let { requestUsbPermission(it) }
             },
             onAddClicked = {
-                if (selectedTab == 0) {
+                if (selectedTab == 1) {
                     filePickerLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
                 } else {
                     bookPickerLauncher.launch(
@@ -676,7 +678,7 @@ fun KoboDictManagerSingleScreen(
             onOpenFolderClicked = {
                 if (currentKobo != null) {
                     scope.launch(Dispatchers.IO) {
-                        if (selectedTab == 0) {
+                        if (selectedTab == 1) {
                             val list = backend.listKoboDictFolder()
                             withContext(Dispatchers.Main) {
                                 folderFiles = list
@@ -724,174 +726,8 @@ fun KoboDictManagerSingleScreen(
         )
 
         if (selectedTab == 0) {
-            // ---------------------------------------------------------------------
-            // 3. TARJETA FIJA: DICCIONARIO OFICIAL DE FÁBRICA DEL EREADER
-            // ---------------------------------------------------------------------
-            DictionaryCompactCard(
-                modifier = Modifier.fillMaxWidth(),
-                palette = palette,
-                lang = lang,
-                title = tr(lang, "official_dict_name", "lang" to koboLangName),
-                subtitle = tr(lang, "official_dict_desc", "slot" to primarySlot),
-                slotName = primarySlot,
-                sizeBytes = officialInfo.size,
-                isActive = isOfficialActive,
-                isFactory = true,
-                isReadOnly = if (isOfficialActive) isReadOnlyOnKobo else false,
-                onActivate = {
-                    triggerActivateDictionary("__official_factory_kobo__", isFactory = true, slotName = primarySlot)
-                },
-                onDelete = null
-            )
-
-        // ---------------------------------------------------------------------
-        // 4. SECCIÓN CENTRAL FLEXIBLE (weight 1f): BIBLIOTECA PERSONALIZADA SIN SCROLL
-        // ---------------------------------------------------------------------
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = palette.cardBg),
-            border = BorderStroke(1.dp, palette.cardBorder)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Cabecera de la biblioteca + Paginador compacto si hay más de 3
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(palette.koboRed)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "${tr(lang, "custom_dicts_title")} (${catalogList.size})",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = palette.textPrimary
-                        )
-                    }
-
-                    if (totalPages > 1) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            SmallPageButton(
-                                text = "◀",
-                                enabled = currentPage > 0,
-                                palette = palette,
-                                onClick = { if (currentPage > 0) currentPage-- }
-                            )
-                            Text(
-                                text = "${currentPage + 1} / $totalPages",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = palette.textSecondary
-                            )
-                            SmallPageButton(
-                                text = "▶",
-                                enabled = currentPage < totalPages - 1,
-                                palette = palette,
-                                onClick = { if (currentPage < totalPages - 1) currentPage++ }
-                            )
-                        }
-                    }
-                }
-
-                if (pageItems.isEmpty()) {
-                    // Estado vacío elegante centrado en el hueco disponible
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .border(
-                                width = 1.dp,
-                                color = palette.cardBorder,
-                                shape = RoundedCornerShape(10.dp)
-                            )
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = "📖",
-                                fontSize = 28.sp
-                            )
-                            Text(
-                                text = tr(lang, "empty_library_hint"),
-                                fontSize = 13.sp,
-                                color = palette.textSecondary,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                } else {
-                    // Hasta 3 tarjetas distribuidas uniformemente sin necesidad de hacer scroll
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        for (item in pageItems) {
-                            val isItemActive = (item.key == activeCatalogKey)
-                            val targetSlot = item.targetSlot.ifEmpty { primarySlot }
-                            val sub = tr(
-                                lang,
-                                "file_added_label",
-                                "file" to item.sourceFile,
-                                "date" to item.addedDate
-                            )
-                            DictionaryCompactCard(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f),
-                                palette = palette,
-                                lang = lang,
-                                title = item.name,
-                                subtitle = sub,
-                                slotName = targetSlot,
-                                sizeBytes = item.size,
-                                isActive = isItemActive,
-                                isFactory = false,
-                                isReadOnly = if (isItemActive) isReadOnlyOnKobo else false,
-                                onActivate = {
-                                    triggerActivateDictionary(item.key, isFactory = false, slotName = targetSlot)
-                                },
-                                onDelete = {
-                                    confirmTitle = tr(lang, "confirm_delete_title")
-                                    confirmMessage = tr(lang, "confirm_delete_msg", "name" to item.name)
-                                    confirmAction = {
-                                        backend.deleteFromCatalog(item.key)
-                                        refreshCatalogAndInstalled(currentKobo)
-                                        statusText = "Eliminado: ${item.name}"
-                                    }
-                                }
-                            )
-                        }
-                        // Rellenar hueco si hay menos de 3 elementos para mantener proporción limpia
-                        repeat(itemsPerPage - pageItems.size) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
-            }
-        }
-        } else {
             // -----------------------------------------------------------------
-            // 4B. PANEL DE LIBROS EN EL KOBO (CON PAGINACIÓN COMPACTA Y BORRADO)
+            // 3A. PANEL DE LIBROS EN EL KOBO (PRIMERA PESTAÑA)
             // -----------------------------------------------------------------
             KoboBooksLibraryCard(
                 modifier = Modifier
@@ -906,7 +742,7 @@ fun KoboDictManagerSingleScreen(
                 onPageChange = { booksPage = it },
                 onDeleteBook = { book ->
                     confirmTitle = tr(lang, "confirm_delete_book_title")
-                    confirmMessage = tr(lang, "confirm_delete_book_msg", "name" to book.name)
+                    confirmMessage = tr(lang, "confirm_delete_book_msg", "name" to book.displayTitle)
                     confirmAction = {
                         scope.launch(Dispatchers.IO) {
                             try {
@@ -914,7 +750,7 @@ fun KoboDictManagerSingleScreen(
                                 val updated = backend.listKoboBooks()
                                 withContext(Dispatchers.Main) {
                                     koboBooks = updated
-                                    statusText = tr(lang, "book_deleted_status", "name" to book.name)
+                                    statusText = tr(lang, "book_deleted_status", "name" to book.displayTitle)
                                 }
                             } catch (e: Exception) {
                                 withContext(Dispatchers.Main) {
@@ -926,6 +762,139 @@ fun KoboDictManagerSingleScreen(
                     }
                 }
             )
+        } else {
+            // -----------------------------------------------------------------
+            // 3B. CUADRO UNIFICADO DE DICCIONARIOS (OFICIAL + AÑADIDOS)
+            // -----------------------------------------------------------------
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = palette.cardBg),
+                border = BorderStroke(1.dp, palette.cardBorder)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Cabecera unificada + Paginador compacto
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(palette.koboRed)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "${tr(lang, "tab_dicts")} ($totalDictEntries)",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = palette.textPrimary
+                            )
+                        }
+
+                        if (totalPages > 1) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                SmallPageButton(
+                                    text = "◀",
+                                    enabled = currentPage > 0,
+                                    palette = palette,
+                                    onClick = { if (currentPage > 0) currentPage-- }
+                                )
+                                Text(
+                                    text = "${currentPage + 1} / $totalPages",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = palette.textSecondary
+                                )
+                                SmallPageButton(
+                                    text = "▶",
+                                    enabled = currentPage < totalPages - 1,
+                                    palette = palette,
+                                    onClick = { if (currentPage < totalPages - 1) currentPage++ }
+                                )
+                            }
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        for (idx in pageIndices) {
+                            if (idx == 0) {
+                                DictionaryCompactCard(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                    palette = palette,
+                                    lang = lang,
+                                    title = tr(lang, "official_dict_name", "lang" to koboLangName),
+                                    subtitle = tr(lang, "official_dict_desc", "slot" to primarySlot),
+                                    sizeBytes = officialInfo.size,
+                                    isActive = isOfficialActive,
+                                    isFactory = true,
+                                    isReadOnly = if (isOfficialActive) isReadOnlyOnKobo else false,
+                                    onActivate = {
+                                        triggerActivateDictionary("__official_factory_kobo__", isFactory = true, slotName = primarySlot)
+                                    },
+                                    onDelete = null
+                                )
+                            } else {
+                                val item = catalogList[idx - 1]
+                                val isItemActive = (item.key == activeCatalogKey)
+                                val targetSlot = item.targetSlot.ifEmpty { primarySlot }
+                                val sub = tr(
+                                    lang,
+                                    "file_added_label",
+                                    "file" to item.sourceFile,
+                                    "date" to item.addedDate
+                                )
+                                DictionaryCompactCard(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                    palette = palette,
+                                    lang = lang,
+                                    title = item.name,
+                                    subtitle = sub,
+                                    sizeBytes = item.size,
+                                    isActive = isItemActive,
+                                    isFactory = false,
+                                    isReadOnly = if (isItemActive) isReadOnlyOnKobo else false,
+                                    onActivate = {
+                                        triggerActivateDictionary(item.key, isFactory = false, slotName = targetSlot)
+                                    },
+                                    onDelete = {
+                                        confirmTitle = tr(lang, "confirm_delete_title")
+                                        confirmMessage = tr(lang, "confirm_delete_msg", "name" to item.name)
+                                        confirmAction = {
+                                            backend.deleteFromCatalog(item.key)
+                                            refreshCatalogAndInstalled(currentKobo)
+                                            statusText = "Eliminado: ${item.name}"
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        repeat(itemsPerPage - pageIndices.size) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
         }
 
         // ---------------------------------------------------------------------
@@ -1363,7 +1332,7 @@ private fun KoboUsbStatusCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val primaryEnabled = if (selectedTab == 0) true else currentKobo != null
+                val primaryEnabled = if (selectedTab == 1) true else currentKobo != null
                 Button(
                     onClick = onAddClicked,
                     enabled = primaryEnabled,
@@ -1378,7 +1347,7 @@ private fun KoboUsbStatusCard(
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                 ) {
                     Text(
-                        text = if (selectedTab == 0) tr(lang, "add_dicts_btn") else tr(lang, "upload_books_btn"),
+                        text = if (selectedTab == 1) tr(lang, "add_dicts_btn") else tr(lang, "upload_books_btn"),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (primaryEnabled) Color.White else palette.textSecondary,
@@ -1398,7 +1367,7 @@ private fun KoboUsbStatusCard(
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                 ) {
                     Text(
-                        text = if (selectedTab == 0) tr(lang, "open_folder_btn") else tr(lang, "refresh_books_btn"),
+                        text = if (selectedTab == 1) tr(lang, "open_folder_btn") else tr(lang, "refresh_books_btn"),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (currentKobo != null) palette.textPrimary else palette.textSecondary,
@@ -1440,7 +1409,6 @@ private fun DictionaryCompactCard(
     lang: String,
     title: String,
     subtitle: String,
-    slotName: String,
     sizeBytes: Long,
     isActive: Boolean,
     isFactory: Boolean,
@@ -1465,11 +1433,11 @@ private fun DictionaryCompactCard(
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Fila 1: Título + Badges de estado
+            // Fila 1: Título completo + Badges de estado (sin slot redundante)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1485,30 +1453,26 @@ private fun DictionaryCompactCard(
                     modifier = Modifier.weight(1f)
                 )
 
-                Spacer(modifier = Modifier.width(6.dp))
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    StatusBadge(
-                        text = "🎯 $slotName",
-                        bg = palette.badgeBg,
-                        fg = palette.textSecondary
-                    )
-                    if (isFactory) {
-                        StatusBadge(
-                            text = tr(lang, "factory_badge"),
-                            bg = palette.factoryBlueBg,
-                            fg = palette.factoryBlueText
-                        )
-                    }
-                    if (isActive) {
-                        StatusBadge(
-                            text = tr(lang, "active_badge"),
-                            bg = palette.activeGreen,
-                            fg = Color.White
-                        )
+                if (isFactory || isActive) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (isFactory) {
+                            StatusBadge(
+                                text = tr(lang, "factory_badge"),
+                                bg = palette.factoryBlueBg,
+                                fg = palette.factoryBlueText
+                            )
+                        }
+                        if (isActive) {
+                            StatusBadge(
+                                text = tr(lang, "active_badge"),
+                                bg = palette.activeGreen,
+                                fg = Color.White
+                            )
+                        }
                     }
                 }
             }
@@ -1667,8 +1631,8 @@ private fun ModeTabBar(
             .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        val dictsSelected = selectedTab == 0
-        val booksSelected = selectedTab == 1
+        val booksSelected = selectedTab == 0
+        val dictsSelected = selectedTab == 1
         val booksLabel = if (booksCount != null) {
             "${tr(lang, "tab_books")} ($booksCount)"
         } else {
@@ -1680,15 +1644,15 @@ private fun ModeTabBar(
                 .weight(1f)
                 .height(32.dp)
                 .clip(RoundedCornerShape(7.dp))
-                .background(if (dictsSelected) palette.koboRed else Color.Transparent)
+                .background(if (booksSelected) palette.koboRed else Color.Transparent)
                 .clickable { onSelectTab(0) },
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = tr(lang, "tab_dicts"),
+                text = booksLabel,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (dictsSelected) Color.White else palette.textSecondary,
+                color = if (booksSelected) Color.White else palette.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1699,15 +1663,15 @@ private fun ModeTabBar(
                 .weight(1f)
                 .height(32.dp)
                 .clip(RoundedCornerShape(7.dp))
-                .background(if (booksSelected) palette.koboRed else Color.Transparent)
+                .background(if (dictsSelected) palette.koboRed else Color.Transparent)
                 .clickable { onSelectTab(1) },
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = booksLabel,
+                text = tr(lang, "tab_dicts"),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (booksSelected) Color.White else palette.textSecondary,
+                color = if (dictsSelected) Color.White else palette.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1886,7 +1850,7 @@ private fun BookCompactCard(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = book.name,
+                    text = book.displayTitle,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = palette.textPrimary,
@@ -1907,10 +1871,17 @@ private fun BookCompactCard(
                         bg = palette.badgeBg,
                         fg = palette.textSecondary
                     )
+                    val metaInfo = if (book.author.isNotEmpty()) {
+                        "${book.author} • ${formatSizeMb(book.size)}"
+                    } else {
+                        formatSizeMb(book.size)
+                    }
                     Text(
-                        text = formatSizeMb(book.size),
+                        text = metaInfo,
                         fontSize = 11.sp,
-                        color = palette.textSecondary
+                        color = palette.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
