@@ -1446,31 +1446,16 @@ private fun DictionaryCompactCard(
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Fila 1: Título completo + Badge de fábrica (sin badge ancho de activo que corte el nombre)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = title,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = palette.textPrimary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-
-                if (isFactory) {
-                    Spacer(modifier = Modifier.width(6.dp))
-                    StatusBadge(
-                        text = tr(lang, "factory_badge"),
-                        bg = palette.factoryBlueBg,
-                        fg = palette.factoryBlueText
-                    )
-                }
-            }
+            // Fila 1: Título completo ocupando todo el ancho (sin etiquetas que corten el nombre)
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = palette.textPrimary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
+            )
 
             // Fila 2: Subtítulo + Badge de protección Wi-Fi si está activo
             Row(
