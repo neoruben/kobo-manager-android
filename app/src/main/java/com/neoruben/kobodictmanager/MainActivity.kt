@@ -1,4 +1,4 @@
-package com.ruben.kobodictmanager
+package com.neoruben.kobodictmanager
 
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -82,7 +82,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
-private const val ACTION_USB_PERMISSION = "com.ruben.kobodictmanager.USB_PERMISSION"
+private const val ACTION_USB_PERMISSION = "com.neoruben.kobodictmanager.USB_PERMISSION"
 
 // Paleta Oficial Rakuten Kobo + E-Ink Carta
 data class KoboPalette(
@@ -215,6 +215,12 @@ fun KoboDictManagerSingleScreen(
     var catalog by remember { mutableStateOf<Map<String, CatalogEntry>>(backend.loadCatalog()) }
     var statusText by remember { mutableStateOf(tr(lang, "ready_status")) }
 
+    // Navegación entre Diccionarios (0) y Libros (1)
+    var selectedTab by remember { mutableIntStateOf(0) }
+    var koboBooks by remember { mutableStateOf<List<KoboBookItem>>(emptyList()) }
+    var booksPage by remember { mutableIntStateOf(0) }
+    val booksPerPage = 4
+
     // Paginación compacta (3 diccionarios por página para que NUNCA haya scroll vertical)
     var currentPage by remember { mutableIntStateOf(0) }
     val itemsPerPage = 3
@@ -267,6 +273,7 @@ fun KoboDictManagerSingleScreen(
                         currentKobo = null
                         pendingPermissionDevice = null
                         installedDict = null
+                        koboBooks = emptyList()
                         statusText = tr(lang, "waiting_usb")
                     }
                 }
@@ -277,6 +284,7 @@ fun KoboDictManagerSingleScreen(
                         pendingPermissionDevice = candidate
                         currentKobo = null
                         installedDict = null
+                        koboBooks = emptyList()
                         statusText = tr(lang, "usb_permission_needed")
                         if (!alreadyPrompted) {
                             requestUsbPermission(candidate)
@@ -287,11 +295,13 @@ fun KoboDictManagerSingleScreen(
                         val info = backend.connectOverUsb(usbManager, candidate)
                         val inst = backend.getInstalledPrimaryDict(info)
                         val cat = backend.loadCatalog()
+                        val books = if (info != null) backend.listKoboBooks() else emptyList()
                         withContext(Dispatchers.Main) {
                             pendingPermissionDevice = null
                             currentKobo = info
                             installedDict = inst
                             catalog = cat
+                            koboBooks = books
                             if (info != null) {
                                 statusText = tr(
                                     lang,
@@ -402,6 +412,75 @@ fun KoboDictManagerSingleScreen(
                         "file" to firstDup.first,
                         "name" to firstDup.second
                     )
+                } else if (errors.isNotEmpty()) {
+                    alertTitle = "Error"
+                    alertMessage = errors.joinToString("\n")
+                }
+            }
+        }
+    }
+
+    val bookPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNullOrEmpty()) return@rememberLauncherForActivityResult
+        if (currentKobo == null) {
+            alertTitle = "Kobo"
+            alertMessage = tr(lang, "not_connected_warning")
+            return@rememberLauncherForActivityResult
+        }
+
+        isTransferring = true
+        progressTitle = tr(lang, "upload_books_btn")
+        progressItemName = ""
+        progressIndeterminate = false
+        progressFraction = 0f
+        progressStatusText = "0%"
+
+        scope.launch(Dispatchers.IO) {
+            var uploadedCount = 0
+            val errors = ArrayList<String>()
+
+            for ((idx, uri) in uris.withIndex()) {
+                val displayName = backend.resolveDisplayName(uri)
+                withContext(Dispatchers.Main) {
+                    progressItemName = tr(
+                        lang,
+                        "uploading_book_progress",
+                        "idx" to (idx + 1).toString(),
+                        "total" to uris.size.toString(),
+                        "name" to displayName
+                    )
+                    progressFraction = 0f
+                    progressStatusText = "0%"
+                }
+
+                try {
+                    backend.uploadBookToKobo(uri, targetFolder = "Books") { copied, total ->
+                        val frac = if (total > 0) (copied.toFloat() / total.toFloat()).coerceIn(0f, 1f) else 0f
+                        scope.launch(Dispatchers.Main) {
+                            progressFraction = frac
+                            progressStatusText = "${(frac * 100).toInt()}% (${formatSizeMb(copied)} / ${formatSizeMb(total)})"
+                        }
+                    }
+                    uploadedCount++
+                } catch (e: Exception) {
+                    errors.add("$displayName: ${e.message}")
+                }
+            }
+
+            val updatedBooks = backend.listKoboBooks()
+            withContext(Dispatchers.Main) {
+                isTransferring = false
+                koboBooks = updatedBooks
+                if (uploadedCount > 0) {
+                    var msg = tr(lang, "upload_books_success_msg", "count" to uploadedCount.toString())
+                    if (errors.isNotEmpty()) {
+                        msg += "\n\n⚠️ " + errors.joinToString("\n")
+                    }
+                    alertTitle = tr(lang, "upload_books_success_title")
+                    alertMessage = msg
+                    statusText = "$uploadedCount libro(s) OK."
                 } else if (errors.isNotEmpty()) {
                     alertTitle = "Error"
                     alertMessage = errors.joinToString("\n")
@@ -570,21 +649,45 @@ fun KoboDictManagerSingleScreen(
         KoboUsbStatusCard(
             lang = lang,
             palette = palette,
+            selectedTab = selectedTab,
             currentKobo = currentKobo,
             pendingPermissionDevice = pendingPermissionDevice,
             onGrantPermission = {
                 pendingPermissionDevice?.let { requestUsbPermission(it) }
             },
             onAddClicked = {
-                filePickerLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
+                if (selectedTab == 0) {
+                    filePickerLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
+                } else {
+                    bookPickerLauncher.launch(
+                        arrayOf(
+                            "application/epub+zip",
+                            "application/pdf",
+                            "application/x-cbz",
+                            "application/x-cbr",
+                            "application/x-mobipocket-ebook",
+                            "text/plain",
+                            "application/octet-stream",
+                            "*/*"
+                        )
+                    )
+                }
             },
             onOpenFolderClicked = {
                 if (currentKobo != null) {
                     scope.launch(Dispatchers.IO) {
-                        val list = backend.listKoboDictFolder()
-                        withContext(Dispatchers.Main) {
-                            folderFiles = list
-                            showFolderDialog = true
+                        if (selectedTab == 0) {
+                            val list = backend.listKoboDictFolder()
+                            withContext(Dispatchers.Main) {
+                                folderFiles = list
+                                showFolderDialog = true
+                            }
+                        } else {
+                            val list = backend.listKoboBooks()
+                            withContext(Dispatchers.Main) {
+                                koboBooks = list
+                                statusText = "${list.size} libro(s) en Kobo"
+                            }
                         }
                     }
                 }
@@ -601,6 +704,7 @@ fun KoboDictManagerSingleScreen(
                             alertMessage = tr(lang, "eject_success_msg", "model" to kobo.model)
                             currentKobo = null
                             installedDict = null
+                            koboBooks = emptyList()
                             statusText = tr(lang, "waiting_usb")
                         }
                     }
@@ -609,24 +713,36 @@ fun KoboDictManagerSingleScreen(
         )
 
         // ---------------------------------------------------------------------
-        // 3. TARJETA FIJA: DICCIONARIO OFICIAL DE FÁBRICA DEL EREADER
+        // 2B. SELECTOR DE MODO (DICCIONARIOS / LIBROS)
         // ---------------------------------------------------------------------
-        DictionaryCompactCard(
-            modifier = Modifier.fillMaxWidth(),
-            palette = palette,
+        ModeTabBar(
             lang = lang,
-            title = tr(lang, "official_dict_name", "lang" to koboLangName),
-            subtitle = tr(lang, "official_dict_desc", "slot" to primarySlot),
-            slotName = primarySlot,
-            sizeBytes = officialInfo.size,
-            isActive = isOfficialActive,
-            isFactory = true,
-            isReadOnly = if (isOfficialActive) isReadOnlyOnKobo else false,
-            onActivate = {
-                triggerActivateDictionary("__official_factory_kobo__", isFactory = true, slotName = primarySlot)
-            },
-            onDelete = null
+            palette = palette,
+            selectedTab = selectedTab,
+            booksCount = if (currentKobo != null) koboBooks.size else null,
+            onSelectTab = { selectedTab = it }
         )
+
+        if (selectedTab == 0) {
+            // ---------------------------------------------------------------------
+            // 3. TARJETA FIJA: DICCIONARIO OFICIAL DE FÁBRICA DEL EREADER
+            // ---------------------------------------------------------------------
+            DictionaryCompactCard(
+                modifier = Modifier.fillMaxWidth(),
+                palette = palette,
+                lang = lang,
+                title = tr(lang, "official_dict_name", "lang" to koboLangName),
+                subtitle = tr(lang, "official_dict_desc", "slot" to primarySlot),
+                slotName = primarySlot,
+                sizeBytes = officialInfo.size,
+                isActive = isOfficialActive,
+                isFactory = true,
+                isReadOnly = if (isOfficialActive) isReadOnlyOnKobo else false,
+                onActivate = {
+                    triggerActivateDictionary("__official_factory_kobo__", isFactory = true, slotName = primarySlot)
+                },
+                onDelete = null
+            )
 
         // ---------------------------------------------------------------------
         // 4. SECCIÓN CENTRAL FLEXIBLE (weight 1f): BIBLIOTECA PERSONALIZADA SIN SCROLL
@@ -772,6 +888,44 @@ fun KoboDictManagerSingleScreen(
                     }
                 }
             }
+        }
+        } else {
+            // -----------------------------------------------------------------
+            // 4B. PANEL DE LIBROS EN EL KOBO (CON PAGINACIÓN COMPACTA Y BORRADO)
+            // -----------------------------------------------------------------
+            KoboBooksLibraryCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                lang = lang,
+                palette = palette,
+                isConnected = currentKobo != null,
+                books = koboBooks,
+                currentPage = booksPage,
+                itemsPerPage = booksPerPage,
+                onPageChange = { booksPage = it },
+                onDeleteBook = { book ->
+                    confirmTitle = tr(lang, "confirm_delete_book_title")
+                    confirmMessage = tr(lang, "confirm_delete_book_msg", "name" to book.name)
+                    confirmAction = {
+                        scope.launch(Dispatchers.IO) {
+                            try {
+                                backend.deleteBookFromKobo(book)
+                                val updated = backend.listKoboBooks()
+                                withContext(Dispatchers.Main) {
+                                    koboBooks = updated
+                                    statusText = tr(lang, "book_deleted_status", "name" to book.name)
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    alertTitle = "Error"
+                                    alertMessage = e.message ?: "Error al eliminar el libro"
+                                }
+                            }
+                        }
+                    }
+                }
+            )
         }
 
         // ---------------------------------------------------------------------
@@ -1104,6 +1258,7 @@ private fun TopKoboHeaderBar(
 private fun KoboUsbStatusCard(
     lang: String,
     palette: KoboPalette,
+    selectedTab: Int,
     currentKobo: KoboDeviceInfo?,
     pendingPermissionDevice: UsbDevice?,
     onGrantPermission: () -> Unit,
@@ -1208,21 +1363,27 @@ private fun KoboUsbStatusCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val primaryEnabled = if (selectedTab == 0) true else currentKobo != null
                 Button(
                     onClick = onAddClicked,
+                    enabled = primaryEnabled,
                     modifier = Modifier
-                        .weight(1.2f)
+                        .weight(1.25f)
                         .height(36.dp),
                     shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = palette.koboRed),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = palette.koboRed,
+                        disabledContainerColor = palette.badgeBg
+                    ),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                 ) {
                     Text(
-                        text = tr(lang, "add_dicts_btn"),
+                        text = if (selectedTab == 0) tr(lang, "add_dicts_btn") else tr(lang, "upload_books_btn"),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        maxLines = 1
+                        color = if (primaryEnabled) Color.White else palette.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -1237,11 +1398,12 @@ private fun KoboUsbStatusCard(
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                 ) {
                     Text(
-                        text = tr(lang, "open_folder_btn"),
+                        text = if (selectedTab == 0) tr(lang, "open_folder_btn") else tr(lang, "refresh_books_btn"),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (currentKobo != null) palette.textPrimary else palette.textSecondary,
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -1485,5 +1647,283 @@ private fun SmallPageButton(
             fontWeight = FontWeight.Bold,
             color = if (enabled) Color.White else palette.textSecondary
         )
+    }
+}
+
+@Composable
+private fun ModeTabBar(
+    lang: String,
+    palette: KoboPalette,
+    selectedTab: Int,
+    booksCount: Int?,
+    onSelectTab: (Int) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(palette.cardBg)
+            .border(1.dp, palette.cardBorder, RoundedCornerShape(10.dp))
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        val dictsSelected = selectedTab == 0
+        val booksSelected = selectedTab == 1
+        val booksLabel = if (booksCount != null) {
+            "${tr(lang, "tab_books")} ($booksCount)"
+        } else {
+            tr(lang, "tab_books")
+        }
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(32.dp)
+                .clip(RoundedCornerShape(7.dp))
+                .background(if (dictsSelected) palette.koboRed else Color.Transparent)
+                .clickable { onSelectTab(0) },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = tr(lang, "tab_dicts"),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (dictsSelected) Color.White else palette.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(32.dp)
+                .clip(RoundedCornerShape(7.dp))
+                .background(if (booksSelected) palette.koboRed else Color.Transparent)
+                .clickable { onSelectTab(1) },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = booksLabel,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (booksSelected) Color.White else palette.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun KoboBooksLibraryCard(
+    modifier: Modifier = Modifier,
+    lang: String,
+    palette: KoboPalette,
+    isConnected: Boolean,
+    books: List<KoboBookItem>,
+    currentPage: Int,
+    itemsPerPage: Int,
+    onPageChange: (Int) -> Unit,
+    onDeleteBook: (KoboBookItem) -> Unit
+) {
+    val totalPages = ((books.size + itemsPerPage - 1) / itemsPerPage).coerceAtLeast(1)
+    val safePage = currentPage.coerceIn(0, totalPages - 1)
+    if (safePage != currentPage) onPageChange(safePage)
+    val pageItems = books.drop(safePage * itemsPerPage).take(itemsPerPage)
+
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = palette.cardBg),
+        border = BorderStroke(1.dp, palette.cardBorder)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(palette.koboRed)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "${tr(lang, "kobo_books_title")} (${books.size})",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = palette.textPrimary
+                    )
+                }
+
+                if (totalPages > 1) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        SmallPageButton(
+                            text = "◀",
+                            enabled = safePage > 0,
+                            palette = palette,
+                            onClick = { if (safePage > 0) onPageChange(safePage - 1) }
+                        )
+                        Text(
+                            text = "${safePage + 1} / $totalPages",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = palette.textSecondary
+                        )
+                        SmallPageButton(
+                            text = "▶",
+                            enabled = safePage < totalPages - 1,
+                            palette = palette,
+                            onClick = { if (safePage < totalPages - 1) onPageChange(safePage + 1) }
+                        )
+                    }
+                }
+            }
+
+            if (!isConnected) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .border(1.dp, palette.cardBorder, RoundedCornerShape(10.dp))
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(text = "🔌", fontSize = 28.sp)
+                        Text(
+                            text = tr(lang, "connect_books_hint"),
+                            fontSize = 13.sp,
+                            color = palette.textSecondary,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else if (pageItems.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .border(1.dp, palette.cardBorder, RoundedCornerShape(10.dp))
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(text = "📚", fontSize = 28.sp)
+                        Text(
+                            text = tr(lang, "empty_books_hint"),
+                            fontSize = 13.sp,
+                            color = palette.textSecondary,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    for (book in pageItems) {
+                        BookCompactCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            palette = palette,
+                            book = book,
+                            onDelete = { onDeleteBook(book) }
+                        )
+                    }
+                    repeat(itemsPerPage - pageItems.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BookCompactCard(
+    modifier: Modifier = Modifier,
+    palette: KoboPalette,
+    book: KoboBookItem,
+    onDelete: () -> Unit
+) {
+    val folderLabel = if (book.folderPath.isEmpty()) "/" else "/${book.folderPath}"
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = palette.bg,
+        border = BorderStroke(1.dp, palette.cardBorder)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = book.name,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = palette.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    StatusBadge(
+                        text = book.format,
+                        bg = palette.koboRedSoft,
+                        fg = palette.koboRed
+                    )
+                    StatusBadge(
+                        text = folderLabel,
+                        bg = palette.badgeBg,
+                        fg = palette.textSecondary
+                    )
+                    Text(
+                        text = formatSizeMb(book.size),
+                        fontSize = 11.sp,
+                        color = palette.textSecondary
+                    )
+                }
+            }
+
+            OutlinedButton(
+                onClick = onDelete,
+                modifier = Modifier.size(34.dp),
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, palette.cardBorder),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Text(text = "🗑️", fontSize = 13.sp)
+            }
+        }
     }
 }

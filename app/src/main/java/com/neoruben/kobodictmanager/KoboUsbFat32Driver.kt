@@ -1,4 +1,4 @@
-package com.ruben.kobodictmanager
+package com.neoruben.kobodictmanager
 
 import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
@@ -727,6 +727,210 @@ class Fat32Volume(val device: BlockDevice) {
     }
 
     /**
+     * Crea un directorio en `parentPath` (o lo devuelve si ya existe).
+     */
+    fun createDirectory(parentPath: String, dirName: String): Fat32Entry {
+        val parentCluster = resolveDirCluster(parentPath)
+        val existing = listDirectory(parentCluster).firstOrNull {
+            it.name.equals(dirName, ignoreCase = true)
+        }
+        if (existing != null) {
+            if (!existing.isDirectory) {
+                throw IOException("Ya existe un archivo llamado '$dirName' en '$parentPath'.")
+            }
+            return existing
+        }
+
+        // Reservar 1 cluster libre para el nuevo directorio
+        val fatBytesPerTable = (sectorsPerFat * bytesPerSector).toInt()
+        val fatData = ByteArray(fatBytesPerTable)
+        device.readSectors(fatStartLba, sectorsPerFat.toInt(), fatData)
+        val fatBuf = ByteBuffer.wrap(fatData).order(ByteOrder.LITTLE_ENDIAN)
+
+        var newCluster = -1L
+        for (c in 2L until (totalClusters + 2)) {
+            val byteIdx = (c * 4L).toInt()
+            if ((fatBuf.getInt(byteIdx).toLong() and 0x0FFFFFFFL) == 0L) {
+                newCluster = c
+                val prev = fatBuf.getInt(byteIdx).toLong() and 0xF0000000L
+                fatBuf.putInt(byteIdx, (prev or EOC_MARKER).toInt())
+                val secIdx = byteIdx / bytesPerSector
+                val byteOff = secIdx * bytesPerSector
+                for (f in 0 until numFats) {
+                    device.writeSectors(fatStartLba + (f * sectorsPerFat) + secIdx, 1, fatData, byteOff)
+                }
+                break
+            }
+        }
+        if (newCluster < 2L) throw IOException("Espacio insuficiente en la partición FAT32 del Kobo.")
+
+        // Inicializar cluster del nuevo directorio con '.' y '..'
+        val (dosTime, dosDate) = getCurrentDosDateTime()
+        val clusterBuf = ByteArray(clusterSize)
+        val cbb = ByteBuffer.wrap(clusterBuf).order(ByteOrder.LITTLE_ENDIAN)
+
+        fun writeDotEntry(off: Int, label: String, targetClus: Long) {
+            val nameBytes = label.padEnd(11, ' ').toByteArray(StandardCharsets.ISO_8859_1)
+            System.arraycopy(nameBytes, 0, clusterBuf, off, 11)
+            cbb.put(off + 11, ATTR_DIRECTORY.toByte())
+            cbb.putShort(off + 14, dosTime.toShort())
+            cbb.putShort(off + 16, dosDate.toShort())
+            cbb.putShort(off + 18, dosDate.toShort())
+            cbb.putShort(off + 20, ((targetClus ushr 16) and 0xFFFF).toShort())
+            cbb.putShort(off + 22, dosTime.toShort())
+            cbb.putShort(off + 24, dosDate.toShort())
+            cbb.putShort(off + 26, (targetClus and 0xFFFF).toShort())
+            cbb.putInt(off + 28, 0)
+        }
+        writeDotEntry(0, ".", newCluster)
+        writeDotEntry(32, "..", if (parentCluster == rootCluster) 0L else parentCluster)
+        device.writeSectors(clusterToLba(newCluster), sectorsPerCluster, clusterBuf)
+
+        val targetSpot = allocateDirectoryEntry(parentCluster, dirName, ATTR_DIRECTORY)
+        val dirSec = ByteArray(bytesPerSector)
+        device.readSectors(targetSpot.first, 1, dirSec)
+        val dbb = ByteBuffer.wrap(dirSec).order(ByteOrder.LITTLE_ENDIAN)
+        val off = targetSpot.second
+        dbb.put(off + 11, ATTR_DIRECTORY.toByte())
+        dbb.putShort(off + 14, dosTime.toShort())
+        dbb.putShort(off + 16, dosDate.toShort())
+        dbb.putShort(off + 18, dosDate.toShort())
+        dbb.putShort(off + 20, ((newCluster ushr 16) and 0xFFFF).toShort())
+        dbb.putShort(off + 22, dosTime.toShort())
+        dbb.putShort(off + 24, dosDate.toShort())
+        dbb.putShort(off + 26, (newCluster and 0xFFFF).toShort())
+        dbb.putInt(off + 28, 0)
+        device.writeSectors(targetSpot.first, 1, dirSec)
+        device.sync()
+
+        return Fat32Entry(
+            name = dirName,
+            isDirectory = true,
+            isReadOnly = false,
+            attr = ATTR_DIRECTORY,
+            firstCluster = newCluster,
+            size = 0L,
+            dirEntryLba = targetSpot.first,
+            dirEntryOffset = targetSpot.second
+        )
+    }
+
+    /**
+     * Elimina un archivo en `dirPath`, liberando su cadena de clusters y marcando su entrada como borrada (0xE5).
+     */
+    fun deleteFile(dirPath: String, fileName: String): Boolean {
+        val dirCluster = resolveDirCluster(dirPath)
+        val chain = getClusterChain(dirCluster)
+        val secBuf = ByteArray(bytesPerSector)
+        val lfnSlots = ArrayList<Pair<Long, Int>>()
+        val lfnParts = ArrayList<Pair<Int, String>>()
+
+        for (cluster in chain) {
+            val baseLba = clusterToLba(cluster)
+            for (s in 0 until sectorsPerCluster) {
+                val lba = baseLba + s
+                device.readSectors(lba, 1, secBuf)
+                var offset = 0
+                while (offset < bytesPerSector) {
+                    val firstByte = secBuf[offset].toInt() and 0xFF
+                    if (firstByte == 0x00) return false
+                    if (firstByte == 0xE5) {
+                        lfnSlots.clear()
+                        lfnParts.clear()
+                        offset += 32
+                        continue
+                    }
+
+                    val attr = secBuf[offset + 11].toInt() and 0xFF
+                    if (attr == ATTR_LFN) {
+                        lfnSlots.add(Pair(lba, offset))
+                        lfnParts.add(Pair(firstByte and 0x1F, decodeLfnEntry(secBuf, offset)))
+                        offset += 32
+                        continue
+                    }
+
+                    if ((attr and ATTR_VOLUME_ID) != 0) {
+                        lfnSlots.clear()
+                        lfnParts.clear()
+                        offset += 32
+                        continue
+                    }
+
+                    val name = if (lfnParts.isNotEmpty()) {
+                        val full = lfnParts.sortedBy { it.first }.joinToString("") { it.second }
+                        lfnParts.clear()
+                        full
+                    } else {
+                        decodeShortName(secBuf, offset)
+                    }
+
+                    val isDir = (attr and ATTR_DIRECTORY) != 0
+                    if (!isDir && name.equals(fileName, ignoreCase = true)) {
+                        val bb = ByteBuffer.wrap(secBuf).order(ByteOrder.LITTLE_ENDIAN)
+                        val clusHi = bb.getShort(offset + 20).toLong() and 0xFFFFL
+                        val clusLo = bb.getShort(offset + 26).toLong() and 0xFFFFL
+                        val firstClus = (clusHi shl 16) or clusLo
+
+                        // 1. Liberar cadena de clusters en FAT1 y FAT2
+                        if (firstClus >= 2L) {
+                            val fatBytesPerTable = (sectorsPerFat * bytesPerSector).toInt()
+                            val fatData = ByteArray(fatBytesPerTable)
+                            device.readSectors(fatStartLba, sectorsPerFat.toInt(), fatData)
+                            val fatBuf = ByteBuffer.wrap(fatData).order(ByteOrder.LITTLE_ENDIAN)
+                            val dirtyFatSectors = HashSet<Int>()
+
+                            var c = firstClus
+                            var guard = 0L
+                            while (c in 2L until EOC_MIN && guard < totalClusters + 2) {
+                                val byteIdx = (c * 4L).toInt()
+                                val prev = fatBuf.getInt(byteIdx).toLong()
+                                val next = prev and 0x0FFFFFFFL
+                                fatBuf.putInt(byteIdx, (prev and 0xF0000000L).toInt())
+                                dirtyFatSectors.add(byteIdx / bytesPerSector)
+                                c = next
+                                guard++
+                            }
+
+                            for (secIdx in dirtyFatSectors.sorted()) {
+                                val byteOff = secIdx * bytesPerSector
+                                for (f in 0 until numFats) {
+                                    device.writeSectors(fatStartLba + (f * sectorsPerFat) + secIdx, 1, fatData, byteOff)
+                                }
+                            }
+                        }
+
+                        // 2. Marcar entradas LFN + 8.3 como borradas (0xE5)
+                        val allSlots = lfnSlots + Pair(lba, offset)
+                        for ((slotLba, slotOff) in allSlots.groupBy { it.first }) {
+                            val modBuf = ByteArray(bytesPerSector)
+                            device.readSectors(slotLba, 1, modBuf)
+                            for ((_, o) in slotOff) {
+                                modBuf[o] = 0xE5.toByte()
+                            }
+                            device.writeSectors(slotLba, 1, modBuf)
+                        }
+                        device.sync()
+                        return true
+                    }
+
+                    lfnSlots.clear()
+                    offset += 32
+                }
+            }
+        }
+        return false
+    }
+
+    private fun resolveDirCluster(dirPath: String): Long {
+        val trimmed = dirPath.trim('/')
+        if (trimmed.isEmpty()) return rootCluster
+        val dirEntry = findEntry(trimmed)
+            ?: throw IOException("El directorio '$dirPath' no existe en el Kobo.")
+        if (!dirEntry.isDirectory) throw IOException("'$dirPath' no es un directorio.")
+        return dirEntry.firstCluster
+    }
+
+    /**
      * Escribe o reemplaza un archivo desde el almacenamiento local hacia un directorio del Kobo
      * (por ejemplo, ".kobo/dict/dicthtml-es.zip"), actualizando FAT1, FAT2 y el atributo Read-Only.
      */
@@ -737,14 +941,7 @@ class Fat32Volume(val device: BlockDevice) {
         readOnly: Boolean,
         progressCb: ((Long, Long) -> Unit)? = null
     ): Fat32Entry {
-        val dirCluster = if (dirPath.trim('/').isEmpty()) {
-            rootCluster
-        } else {
-            val dirEntry = findEntry(dirPath)
-                ?: throw IOException("El directorio '$dirPath' no existe en el Kobo.")
-            if (!dirEntry.isDirectory) throw IOException("'$dirPath' no es un directorio.")
-            dirEntry.firstCluster
-        }
+        val dirCluster = resolveDirCluster(dirPath)
 
         val existing = listDirectory(dirCluster).firstOrNull {
             it.name.equals(fileName, ignoreCase = true)
@@ -892,10 +1089,39 @@ class Fat32Volume(val device: BlockDevice) {
         )
     }
 
-    private fun allocateDirectoryEntry(dirCluster: Long, fileName: String): Pair<Long, Int> {
-        val lfnRecords = buildLfnAndShortEntries(fileName)
-        val neededSlots = lfnRecords.size
+    private fun collectExistingShortNames(chain: List<Long>): Set<String> {
+        val names = HashSet<String>()
+        val secBuf = ByteArray(bytesPerSector)
+        for (clus in chain) {
+            val baseLba = clusterToLba(clus)
+            for (s in 0 until sectorsPerCluster) {
+                device.readSectors(baseLba + s, 1, secBuf)
+                var off = 0
+                while (off < bytesPerSector) {
+                    val b0 = secBuf[off].toInt() and 0xFF
+                    if (b0 == 0x00) return names
+                    if (b0 != 0xE5) {
+                        val attr = secBuf[off + 11].toInt() and 0xFF
+                        if (attr != ATTR_LFN && (attr and ATTR_VOLUME_ID) == 0) {
+                            names.add(String(secBuf, off, 11, StandardCharsets.ISO_8859_1))
+                        }
+                    }
+                    off += 32
+                }
+            }
+        }
+        return names
+    }
+
+    private fun allocateDirectoryEntry(
+        dirCluster: Long,
+        fileName: String,
+        fileAttr: Int = ATTR_ARCHIVE
+    ): Pair<Long, Int> {
         val chain = getClusterChain(dirCluster)
+        val existingShortNames = collectExistingShortNames(chain)
+        val lfnRecords = buildLfnAndShortEntries(fileName, fileAttr, existingShortNames)
+        val neededSlots = lfnRecords.size
         val secBuf = ByteArray(bytesPerSector)
 
         for (clus in chain) {
@@ -924,11 +1150,55 @@ class Fat32Volume(val device: BlockDevice) {
                 }
             }
         }
-        throw IOException("No hay entradas libres en el directorio FAT32.")
+
+        // Extender la cadena de clusters del directorio si todos los sectores actuales están llenos
+        val lastCluster = chain.lastOrNull() ?: throw IOException("Directorio FAT32 inválido.")
+        val fatBytesPerTable = (sectorsPerFat * bytesPerSector).toInt()
+        val fatData = ByteArray(fatBytesPerTable)
+        device.readSectors(fatStartLba, sectorsPerFat.toInt(), fatData)
+        val fatBuf = ByteBuffer.wrap(fatData).order(ByteOrder.LITTLE_ENDIAN)
+
+        var newCluster = -1L
+        for (c in 2L until (totalClusters + 2)) {
+            val byteIdx = (c * 4L).toInt()
+            if ((fatBuf.getInt(byteIdx).toLong() and 0x0FFFFFFFL) == 0L) {
+                newCluster = c
+                break
+            }
+        }
+        if (newCluster < 2L) throw IOException("No hay entradas ni clusters libres en el directorio FAT32.")
+
+        val lastIdx = (lastCluster * 4L).toInt()
+        val lastPrev = fatBuf.getInt(lastIdx).toLong() and 0xF0000000L
+        fatBuf.putInt(lastIdx, (lastPrev or newCluster).toInt())
+
+        val newIdx = (newCluster * 4L).toInt()
+        val newPrev = fatBuf.getInt(newIdx).toLong() and 0xF0000000L
+        fatBuf.putInt(newIdx, (newPrev or EOC_MARKER).toInt())
+
+        val dirtySectors = setOf(lastIdx / bytesPerSector, newIdx / bytesPerSector)
+        for (secIdx in dirtySectors) {
+            val byteOff = secIdx * bytesPerSector
+            for (f in 0 until numFats) {
+                device.writeSectors(fatStartLba + (f * sectorsPerFat) + secIdx, 1, fatData, byteOff)
+            }
+        }
+
+        val newClusterBuf = ByteArray(clusterSize)
+        for (i in 0 until neededSlots) {
+            System.arraycopy(lfnRecords[i], 0, newClusterBuf, i * 32, 32)
+        }
+        val newBaseLba = clusterToLba(newCluster)
+        device.writeSectors(newBaseLba, sectorsPerCluster, newClusterBuf)
+        return Pair(newBaseLba, (neededSlots - 1) * 32)
     }
 
-    private fun buildLfnAndShortEntries(fileName: String): List<ByteArray> {
-        val shortBytes = generate83Name(fileName)
+    private fun buildLfnAndShortEntries(
+        fileName: String,
+        fileAttr: Int = ATTR_ARCHIVE,
+        existingShortNames: Set<String> = emptySet()
+    ): List<ByteArray> {
+        val shortBytes = generate83Name(fileName, existingShortNames)
         val checksum = computeLfnChecksum(shortBytes)
         val numLfn = (fileName.length + 12) / 13
         val records = ArrayList<ByteArray>(numLfn + 1)
@@ -962,26 +1232,41 @@ class Fat32Volume(val device: BlockDevice) {
 
         val shortRec = ByteArray(32)
         System.arraycopy(shortBytes, 0, shortRec, 0, 11)
-        shortRec[11] = ATTR_ARCHIVE.toByte()
+        shortRec[11] = fileAttr.toByte()
         records.add(shortRec)
         return records
     }
 
-    private fun generate83Name(fileName: String): ByteArray {
+    private fun generate83Name(fileName: String, existingShortNames: Set<String> = emptySet()): ByteArray {
         val upper = fileName.uppercase()
         val dot = upper.lastIndexOf('.')
         val rawBase = (if (dot > 0) upper.substring(0, dot) else upper)
             .replace(Regex("[^A-Z0-9_-]"), "")
+            .ifEmpty { "FILE" }
         val rawExt = (if (dot > 0) upper.substring(dot + 1) else "")
             .replace(Regex("[^A-Z0-9_-]"), "")
+        val ext3 = rawExt.take(3).padEnd(3, ' ')
 
-        val base8 = if (rawBase.length > 8) {
+        val initialBase8 = if (rawBase.length > 8) {
             rawBase.substring(0, 6) + "~1"
         } else {
             rawBase.padEnd(8, ' ')
         }
-        val ext3 = rawExt.take(3).padEnd(3, ' ')
-        return (base8 + ext3).toByteArray(StandardCharsets.ISO_8859_1)
+        val initialCandidate = initialBase8 + ext3
+        if (!existingShortNames.contains(initialCandidate)) {
+            return initialCandidate.toByteArray(StandardCharsets.ISO_8859_1)
+        }
+
+        for (n in 1..999) {
+            val suffix = "~$n"
+            val prefixLen = (8 - suffix.length).coerceAtLeast(1)
+            val candidateBase = (rawBase.take(prefixLen) + suffix).padEnd(8, ' ')
+            val candidate = candidateBase + ext3
+            if (!existingShortNames.contains(candidate)) {
+                return candidate.toByteArray(StandardCharsets.ISO_8859_1)
+            }
+        }
+        return initialCandidate.toByteArray(StandardCharsets.ISO_8859_1)
     }
 
     private fun computeLfnChecksum(shortName11: ByteArray): Byte {

@@ -1,4 +1,4 @@
-package com.ruben.kobodictmanager
+package com.neoruben.kobodictmanager
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -177,6 +177,60 @@ class Fat32VolumeTest {
             assertFalse(afterUnlock!!.isReadOnly)
         } finally {
             tempDict.delete()
+        }
+    }
+
+    @Test
+    fun testCreateDirectoryWriteBooksAndDelete() {
+        val dev = createMockKoboFat32Device()
+        val vol = Fat32Volume(dev)
+
+        val booksDir = vol.createDirectory("", "Books")
+        assertTrue(booksDir.isDirectory)
+        assertEquals("Books", booksDir.name)
+
+        // Idempotencia al volver a crear el mismo directorio
+        val booksDirAgain = vol.createDirectory("", "Books")
+        assertEquals(booksDir.firstCluster, booksDirAgain.firstCluster)
+
+        val tempBook1 = File.createTempFile("book1", ".epub")
+        val tempBook2 = File.createTempFile("book2", ".epub")
+        try {
+            val payload1 = ByteArray(1800) { idx -> (idx and 0xFF).toByte() }
+            val payload2 = ByteArray(1200) { idx -> ((idx * 7) and 0xFF).toByte() }
+            tempBook1.writeBytes(payload1)
+            tempBook2.writeBytes(payload2)
+
+            vol.writeFileFromLocal("Books", "El_Quijote_Parte_1.kepub.epub", tempBook1, readOnly = false)
+            vol.writeFileFromLocal("Books", "El_Quijote_Parte_2.epub", tempBook2, readOnly = false)
+
+            val entries = vol.listDirectory(booksDir.firstCluster)
+            assertEquals(2, entries.size)
+            assertTrue(entries.any { it.name == "El_Quijote_Parte_1.kepub.epub" && !it.isReadOnly })
+            assertTrue(entries.any { it.name == "El_Quijote_Parte_2.epub" && !it.isReadOnly })
+
+            val readBack1 = vol.findEntry("Books/El_Quijote_Parte_1.kepub.epub")
+            assertNotNull(readBack1)
+            assertArrayEquals(payload1, vol.readFileBytes(readBack1!!))
+
+            // Eliminar el primer libro y verificar que el segundo sigue intacto
+            assertTrue(vol.deleteFile("Books", "El_Quijote_Parte_1.kepub.epub"))
+            val afterDelete = vol.listDirectory(booksDir.firstCluster)
+            assertEquals(1, afterDelete.size)
+            assertEquals("El_Quijote_Parte_2.epub", afterDelete[0].name)
+
+            val readBack2 = vol.findEntry("Books/El_Quijote_Parte_2.epub")
+            assertNotNull(readBack2)
+            assertArrayEquals(payload2, vol.readFileBytes(readBack2!!))
+
+            // Reutilizar el espacio liberado escribiendo otro libro
+            vol.writeFileFromLocal("Books", "Dune.epub", tempBook1, readOnly = false)
+            val afterReadd = vol.listDirectory(booksDir.firstCluster)
+            assertEquals(2, afterReadd.size)
+            assertTrue(afterReadd.any { it.name == "Dune.epub" })
+        } finally {
+            tempBook1.delete()
+            tempBook2.delete()
         }
     }
 }

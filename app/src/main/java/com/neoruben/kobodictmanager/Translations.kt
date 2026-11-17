@@ -1,4 +1,4 @@
-package com.ruben.kobodictmanager
+package com.neoruben.kobodictmanager
 
 import java.util.Locale
 
@@ -133,7 +133,20 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "cancel_btn" to "Cancelar",
         "accept_btn" to "Aceptar",
         "folder_dialog_title" to "Archivos en .kobo/dict",
-        "close_btn" to "Cerrar"
+        "close_btn" to "Cerrar",
+        "tab_dicts" to "📖 Diccionarios",
+        "tab_books" to "📚 Libros",
+        "upload_books_btn" to "➕ Cargar Libros",
+        "refresh_books_btn" to "🔄 Actualizar",
+        "kobo_books_title" to "Libros en el Kobo",
+        "empty_books_hint" to "No hay libros detectados en tu Kobo.\nPulsa '➕ Cargar Libros' para enviar EPUB, KEPUB, PDF o CBZ.",
+        "connect_books_hint" to "Conecta tu Kobo por USB para ver y cargar libros directamente en su memoria.",
+        "uploading_book_progress" to "Enviando ({idx}/{total}): {name}",
+        "upload_books_success_title" to "Libros enviados",
+        "upload_books_success_msg" to "Se han cargado {count} libro(s) en la carpeta /Books de tu Kobo.\n\nAl pulsar 'Expulsar', el Kobo los importará automáticamente.",
+        "confirm_delete_book_title" to "Eliminar libro del Kobo",
+        "confirm_delete_book_msg" to "¿Seguro que quieres borrar '{name}' de la memoria del Kobo?",
+        "book_deleted_status" to "Libro eliminado: {name}"
     ),
     "en" to mapOf(
         "app_title" to "Kobo DictManager",
@@ -192,7 +205,20 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "cancel_btn" to "Cancel",
         "accept_btn" to "OK",
         "folder_dialog_title" to "Files in .kobo/dict",
-        "close_btn" to "Close"
+        "close_btn" to "Close",
+        "tab_dicts" to "📖 Dictionaries",
+        "tab_books" to "📚 Books",
+        "upload_books_btn" to "➕ Upload Books",
+        "refresh_books_btn" to "🔄 Refresh",
+        "kobo_books_title" to "Books on Kobo",
+        "empty_books_hint" to "No books found on your Kobo.\nTap '➕ Upload Books' to send EPUB, KEPUB, PDF or CBZ.",
+        "connect_books_hint" to "Connect your Kobo via USB to view and upload books directly to its storage.",
+        "uploading_book_progress" to "Uploading ({idx}/{total}): {name}",
+        "upload_books_success_title" to "Books Uploaded",
+        "upload_books_success_msg" to "{count} book(s) uploaded to the /Books folder on your Kobo.\n\nTap 'Eject' so Kobo imports them automatically.",
+        "confirm_delete_book_title" to "Delete Book from Kobo",
+        "confirm_delete_book_msg" to "Are you sure you want to delete '{name}' from your Kobo storage?",
+        "book_deleted_status" to "Book deleted: {name}"
     ),
     "ca" to mapOf(
         "app_title" to "Kobo DictManager",
@@ -251,7 +277,20 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "cancel_btn" to "Cancel·lar",
         "accept_btn" to "D'acord",
         "folder_dialog_title" to "Fitxers a .kobo/dict",
-        "close_btn" to "Tancar"
+        "close_btn" to "Tancar",
+        "tab_dicts" to "📖 Diccionaris",
+        "tab_books" to "📚 Llibres",
+        "upload_books_btn" to "➕ Carregar Llibres",
+        "refresh_books_btn" to "🔄 Actualitzar",
+        "kobo_books_title" to "Llibres al Kobo",
+        "empty_books_hint" to "No s'han trobat llibres al teu Kobo.\nPrem '➕ Carregar Llibres' per enviar EPUB, KEPUB, PDF o CBZ.",
+        "connect_books_hint" to "Connecta el teu Kobo per USB per veure i carregar llibres directament a la memòria.",
+        "uploading_book_progress" to "Enviant ({idx}/{total}): {name}",
+        "upload_books_success_title" to "Llibres enviats",
+        "upload_books_success_msg" to "S'han carregat {count} llibre(s) a la carpeta /Books del teu Kobo.\n\nEn prémer 'Expulsar', el Kobo els importarà automàticament.",
+        "confirm_delete_book_title" to "Eliminar llibre del Kobo",
+        "confirm_delete_book_msg" to "Segur que vols esborrar '{name}' de la memòria del Kobo?",
+        "book_deleted_status" to "Llibre eliminat: {name}"
     ),
     "fr" to mapOf(
         "app_title" to "Kobo DictManager",
@@ -310,7 +349,20 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "cancel_btn" to "Annuler",
         "accept_btn" to "OK",
         "folder_dialog_title" to "Fichiers dans .kobo/dict",
-        "close_btn" to "Fermer"
+        "close_btn" to "Fermer",
+        "tab_dicts" to "📖 Dictionnaires",
+        "tab_books" to "📚 Livres",
+        "upload_books_btn" to "➕ Charger Livres",
+        "refresh_books_btn" to "🔄 Actualiser",
+        "kobo_books_title" to "Livres sur le Kobo",
+        "empty_books_hint" to "Aucun livre détecté sur votre Kobo.\nAppuyez sur '➕ Charger Livres' pour envoyer EPUB, KEPUB, PDF ou CBZ.",
+        "connect_books_hint" to "Connectez votre Kobo par USB pour voir et envoyer des livres.",
+        "uploading_book_progress" to "Envoi ({idx}/{total}) : {name}",
+        "upload_books_success_title" to "Livres envoyés",
+        "upload_books_success_msg" to "{count} livre(s) envoyé(s) dans le dossier /Books de votre Kobo.\n\nAppuyez sur 'Éjecter' pour que le Kobo les importe automatiquement.",
+        "confirm_delete_book_title" to "Supprimer le livre du Kobo",
+        "confirm_delete_book_msg" to "Voulez-vous vraiment supprimer '{name}' de votre Kobo ?",
+        "book_deleted_status" to "Livre supprimé : {name}"
     ),
     "de" to mapOf(
         "app_title" to "Kobo DictManager",
@@ -369,7 +421,20 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "cancel_btn" to "Abbrechen",
         "accept_btn" to "OK",
         "folder_dialog_title" to "Dateien in .kobo/dict",
-        "close_btn" to "Schließen"
+        "close_btn" to "Schließen",
+        "tab_dicts" to "📖 Wörterbücher",
+        "tab_books" to "📚 Bücher",
+        "upload_books_btn" to "➕ Bücher laden",
+        "refresh_books_btn" to "🔄 Aktualisieren",
+        "kobo_books_title" to "Bücher auf dem Kobo",
+        "empty_books_hint" to "Keine Bücher auf Ihrem Kobo gefunden.\nTippen Sie auf '➕ Bücher laden', um EPUB, KEPUB, PDF oder CBZ zu senden.",
+        "connect_books_hint" to "Schließen Sie Ihren Kobo per USB an, um Bücher anzuzeigen und zu übertragen.",
+        "uploading_book_progress" to "Senden ({idx}/{total}): {name}",
+        "upload_books_success_title" to "Bücher gesendet",
+        "upload_books_success_msg" to "{count} Buch/Bücher in den Ordner /Books Ihres Kobo hochgeladen.\n\nTippen Sie auf 'Auswerfen', damit der Kobo sie automatisch importiert.",
+        "confirm_delete_book_title" to "Buch vom Kobo löschen",
+        "confirm_delete_book_msg" to "Möchten Sie '{name}' wirklich vom Kobo löschen?",
+        "book_deleted_status" to "Buch gelöscht: {name}"
     ),
     "it" to mapOf(
         "app_title" to "Kobo DictManager",
@@ -428,7 +493,20 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "cancel_btn" to "Annulla",
         "accept_btn" to "OK",
         "folder_dialog_title" to "File in .kobo/dict",
-        "close_btn" to "Chiudi"
+        "close_btn" to "Chiudi",
+        "tab_dicts" to "📖 Dizionari",
+        "tab_books" to "📚 Libri",
+        "upload_books_btn" to "➕ Carica Libri",
+        "refresh_books_btn" to "🔄 Aggiorna",
+        "kobo_books_title" to "Libri su Kobo",
+        "empty_books_hint" to "Nessun libro rilevato sul tuo Kobo.\nTocca '➕ Carica Libri' per inviare EPUB, KEPUB, PDF o CBZ.",
+        "connect_books_hint" to "Collega il tuo Kobo tramite USB per visualizzare e caricare libri.",
+        "uploading_book_progress" to "Invio ({idx}/{total}): {name}",
+        "upload_books_success_title" to "Libri inviati",
+        "upload_books_success_msg" to "{count} libro/i caricati nella cartella /Books del tuo Kobo.\n\nTocca 'Espelli' per importarli automaticamente.",
+        "confirm_delete_book_title" to "Elimina libro da Kobo",
+        "confirm_delete_book_msg" to "Sei sicuro di voler eliminare '{name}' dalla memoria del Kobo?",
+        "book_deleted_status" to "Libro eliminato: {name}"
     ),
     "pt" to mapOf(
         "app_title" to "Kobo DictManager",
@@ -487,7 +565,20 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "cancel_btn" to "Cancelar",
         "accept_btn" to "OK",
         "folder_dialog_title" to "Arquivos em .kobo/dict",
-        "close_btn" to "Fechar"
+        "close_btn" to "Fechar",
+        "tab_dicts" to "📖 Dicionários",
+        "tab_books" to "📚 Livros",
+        "upload_books_btn" to "➕ Carregar Livros",
+        "refresh_books_btn" to "🔄 Atualizar",
+        "kobo_books_title" to "Livros no Kobo",
+        "empty_books_hint" to "Nenhum livro encontrado no seu Kobo.\nToque em '➕ Carregar Livros' para enviar EPUB, KEPUB, PDF ou CBZ.",
+        "connect_books_hint" to "Conecte seu Kobo via USB para ver e enviar livros diretamente.",
+        "uploading_book_progress" to "Enviando ({idx}/{total}): {name}",
+        "upload_books_success_title" to "Livros enviados",
+        "upload_books_success_msg" to "{count} livro(s) enviado(s) para a pasta /Books do seu Kobo.\n\nToque em 'Ejetar' para o Kobo importá-los automaticamente.",
+        "confirm_delete_book_title" to "Excluir livro do Kobo",
+        "confirm_delete_book_msg" to "Tem certeza que deseja excluir '{name}' da memória do Kobo?",
+        "book_deleted_status" to "Livro excluído: {name}"
     )
 )
 

@@ -1,4 +1,4 @@
-package com.ruben.kobodictmanager
+package com.neoruben.kobodictmanager
 
 import android.content.Context
 import android.database.Cursor
@@ -59,6 +59,13 @@ data class KoboDictFileItem(
     val name: String,
     val size: Long,
     val isReadOnly: Boolean
+)
+
+data class KoboBookItem(
+    val name: String,
+    val folderPath: String,
+    val size: Long,
+    val format: String
 )
 
 class KoboBackend(private val context: Context) {
@@ -668,6 +675,119 @@ class KoboBackend(private val context: Context) {
         )
 
         return targetSlot
+    }
+
+    // -------------------------------------------------------------------------
+    // Gestión de Libros en Kobo (EPUB, KEPUB, PDF, CBZ, CBR, MOBI, TXT...)
+    // -------------------------------------------------------------------------
+    private fun detectBookFormat(fileName: String): String? {
+        val lower = fileName.lowercase()
+        return when {
+            lower.endsWith(".kepub.epub") -> "KEPUB"
+            lower.endsWith(".epub") -> "EPUB"
+            lower.endsWith(".pdf") -> "PDF"
+            lower.endsWith(".cbz") -> "CBZ"
+            lower.endsWith(".cbr") -> "CBR"
+            lower.endsWith(".mobi") -> "MOBI"
+            lower.endsWith(".txt") -> "TXT"
+            lower.endsWith(".html") || lower.endsWith(".htm") -> "HTML"
+            lower.endsWith(".rtf") -> "RTF"
+            else -> null
+        }
+    }
+
+    @Synchronized
+    fun listKoboBooks(): List<KoboBookItem> {
+        val vol = activeVolume ?: return emptyList()
+        val result = ArrayList<KoboBookItem>()
+
+        fun scanDir(dirCluster: Long, dirPath: String, depth: Int) {
+            if (depth > 2) return
+            val entries = try {
+                vol.listDirectory(dirCluster)
+            } catch (_: Exception) {
+                return
+            }
+            for (entry in entries) {
+                val lowerName = entry.name.lowercase()
+                if (entry.isDirectory) {
+                    if (entry.name.startsWith(".") ||
+                        lowerName == "system volume information" ||
+                        lowerName == "\$recycle.bin"
+                    ) {
+                        continue
+                    }
+                    val subPath = if (dirPath.isEmpty()) entry.name else "$dirPath/${entry.name}"
+                    scanDir(entry.firstCluster, subPath, depth + 1)
+                } else {
+                    val fmt = detectBookFormat(entry.name)
+                    if (fmt != null) {
+                        result.add(
+                            KoboBookItem(
+                                name = entry.name,
+                                folderPath = dirPath,
+                                size = entry.size,
+                                format = fmt
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        scanDir(vol.rootCluster, "", 0)
+        return result.sortedBy { it.name.lowercase() }
+    }
+
+    @Synchronized
+    fun uploadBookToKobo(
+        uri: Uri,
+        targetFolder: String = "Books",
+        progressCb: ((Long, Long) -> Unit)? = null
+    ): KoboBookItem {
+        val vol = activeVolume ?: throw IllegalStateException("Lector Kobo no conectado.")
+        val rawName = resolveDisplayName(uri).trim()
+        val cleanName = rawName.replace(Regex("[\\\\/:*?\"<>|]"), "_").ifEmpty { "libro.epub" }
+        val format = detectBookFormat(cleanName)
+            ?: throw IllegalArgumentException("Formato no soportado para Kobo: $cleanName")
+
+        val tempFile = File(context.cacheDir, "kobo_book_${System.currentTimeMillis()}_$cleanName")
+        try {
+            val inputStream = context.contentResolver.openInputStream(uri)
+                ?: throw IllegalStateException("No se pudo leer el archivo seleccionado.")
+            inputStream.use { ins ->
+                FileOutputStream(tempFile).use { outs ->
+                    ins.copyTo(outs, 65536)
+                }
+            }
+
+            if (targetFolder.isNotEmpty()) {
+                vol.createDirectory("", targetFolder)
+            }
+
+            val written = vol.writeFileFromLocal(
+                dirPath = targetFolder,
+                fileName = cleanName,
+                srcFile = tempFile,
+                readOnly = false,
+                progressCb = progressCb
+            )
+
+            return KoboBookItem(
+                name = written.name,
+                folderPath = targetFolder,
+                size = written.size,
+                format = format
+            )
+        } finally {
+            if (tempFile.exists()) tempFile.delete()
+        }
+    }
+
+    @Synchronized
+    fun deleteBookFromKobo(book: KoboBookItem): Boolean {
+        val vol = activeVolume ?: throw IllegalStateException("Lector Kobo no conectado.")
+        return vol.deleteFile(book.folderPath, book.name)
     }
 
     @Synchronized
