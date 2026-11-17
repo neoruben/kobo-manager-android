@@ -12,10 +12,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import android.graphics.BitmapFactory
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,8 +36,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -1437,7 +1446,7 @@ private fun DictionaryCompactCard(
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Fila 1: Título completo + Badges de estado (sin slot redundante)
+            // Fila 1: Título completo + Badge de fábrica (sin badge ancho de activo que corte el nombre)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1448,32 +1457,18 @@ private fun DictionaryCompactCard(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = palette.textPrimary,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
 
-                if (isFactory || isActive) {
+                if (isFactory) {
                     Spacer(modifier = Modifier.width(6.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (isFactory) {
-                            StatusBadge(
-                                text = tr(lang, "factory_badge"),
-                                bg = palette.factoryBlueBg,
-                                fg = palette.factoryBlueText
-                            )
-                        }
-                        if (isActive) {
-                            StatusBadge(
-                                text = tr(lang, "active_badge"),
-                                bg = palette.activeGreen,
-                                fg = Color.White
-                            )
-                        }
-                    }
+                    StatusBadge(
+                        text = tr(lang, "factory_badge"),
+                        bg = palette.factoryBlueBg,
+                        fg = palette.factoryBlueText
+                    )
                 }
             }
 
@@ -1692,9 +1687,14 @@ private fun KoboBooksLibraryCard(
     onDeleteBook: (KoboBookItem) -> Unit
 ) {
     val totalPages = ((books.size + itemsPerPage - 1) / itemsPerPage).coerceAtLeast(1)
-    val safePage = currentPage.coerceIn(0, totalPages - 1)
-    if (safePage != currentPage) onPageChange(safePage)
-    val pageItems = books.drop(safePage * itemsPerPage).take(itemsPerPage)
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredBooks = remember(books, searchQuery) {
+        val q = searchQuery.trim().lowercase()
+        if (q.isEmpty()) books
+        else books.filter {
+            it.displayTitle.lowercase().contains(q) || it.author.lowercase().contains(q)
+        }
+    }
 
     Card(
         modifier = modifier,
@@ -1722,35 +1722,58 @@ private fun KoboBooksLibraryCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "${tr(lang, "kobo_books_title")} (${books.size})",
+                        text = "${tr(lang, "kobo_books_title")} (${filteredBooks.size})",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = palette.textPrimary
                     )
                 }
+            }
 
-                if (totalPages > 1) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+            if (isConnected && books.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(34.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(palette.bg)
+                        .border(1.dp, palette.cardBorder, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "🔍", fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.CenterStart
                     ) {
-                        SmallPageButton(
-                            text = "◀",
-                            enabled = safePage > 0,
-                            palette = palette,
-                            onClick = { if (safePage > 0) onPageChange(safePage - 1) }
+                        if (searchQuery.isEmpty()) {
+                            Text(
+                                text = "Buscar libro o autor...",
+                                fontSize = 12.sp,
+                                color = palette.textSecondary
+                            )
+                        }
+                        BasicTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            singleLine = true,
+                            textStyle = TextStyle(
+                                color = palette.textPrimary,
+                                fontSize = 12.sp
+                            ),
+                            cursorBrush = SolidColor(palette.koboRed),
+                            modifier = Modifier.fillMaxWidth()
                         )
+                    }
+                    if (searchQuery.isNotEmpty()) {
                         Text(
-                            text = "${safePage + 1} / $totalPages",
+                            text = "✕",
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = palette.textSecondary
-                        )
-                        SmallPageButton(
-                            text = "▶",
-                            enabled = safePage < totalPages - 1,
-                            palette = palette,
-                            onClick = { if (safePage < totalPages - 1) onPageChange(safePage + 1) }
+                            color = palette.textSecondary,
+                            modifier = Modifier
+                                .clickable { searchQuery = "" }
+                                .padding(start = 6.dp)
                         )
                     }
                 }
@@ -1777,7 +1800,7 @@ private fun KoboBooksLibraryCard(
                         )
                     }
                 }
-            } else if (pageItems.isEmpty()) {
+            } else if (books.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -1799,22 +1822,20 @@ private fun KoboBooksLibraryCard(
                     }
                 }
             } else {
-                Column(
+                LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    for (book in pageItems) {
+                    items(
+                        items = filteredBooks,
+                        key = { "${it.folderPath}/${it.name}" }
+                    ) { book ->
                         BookCompactCard(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             palette = palette,
                             book = book,
                             onDelete = { onDeleteBook(book) }
                         )
-                    }
-                    repeat(itemsPerPage - pageItems.size) {
-                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -1829,7 +1850,16 @@ private fun BookCompactCard(
     book: KoboBookItem,
     onDelete: () -> Unit
 ) {
-    val folderLabel = if (book.folderPath.isEmpty()) "/" else "/${book.folderPath}"
+    val coverBitmap = remember(book.coverPath) {
+        book.coverPath?.let { path ->
+            try {
+                BitmapFactory.decodeFile(path)?.asImageBitmap()
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(10.dp),
@@ -1838,52 +1868,62 @@ private fun BookCompactCard(
     ) {
         Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(
+            // Portada del libro o miniatura limpia de respaldo
+            Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(end = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                    .width(40.dp)
+                    .height(58.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(palette.badgeBg)
+                    .border(1.dp, palette.cardBorder, RoundedCornerShape(6.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (coverBitmap != null) {
+                    Image(
+                        bitmap = coverBitmap,
+                        contentDescription = book.displayTitle,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Text(
+                        text = if (book.format == "KOBO") "📖" else book.format,
+                        fontSize = if (book.format == "KOBO") 18.sp else 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = palette.textSecondary
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 Text(
                     text = book.displayTitle,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = palette.textPrimary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                val metaInfo = if (book.author.isNotEmpty()) {
+                    "${book.author} • ${formatSizeMb(book.size)}"
+                } else {
+                    formatSizeMb(book.size)
+                }
+                Text(
+                    text = metaInfo,
+                    fontSize = 11.sp,
+                    color = palette.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    StatusBadge(
-                        text = book.format,
-                        bg = palette.koboRedSoft,
-                        fg = palette.koboRed
-                    )
-                    StatusBadge(
-                        text = folderLabel,
-                        bg = palette.badgeBg,
-                        fg = palette.textSecondary
-                    )
-                    val metaInfo = if (book.author.isNotEmpty()) {
-                        "${book.author} • ${formatSizeMb(book.size)}"
-                    } else {
-                        formatSizeMb(book.size)
-                    }
-                    Text(
-                        text = metaInfo,
-                        fontSize = 11.sp,
-                        color = palette.textSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
 
             OutlinedButton(

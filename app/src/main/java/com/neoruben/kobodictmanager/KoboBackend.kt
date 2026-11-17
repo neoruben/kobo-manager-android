@@ -2,6 +2,9 @@ package com.neoruben.kobodictmanager
 
 import android.content.Context
 import android.database.Cursor
+import android.database.sqlite.SQLiteDatabase
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
@@ -12,11 +15,13 @@ import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 import javax.xml.parsers.DocumentBuilderFactory
 
@@ -69,7 +74,8 @@ data class KoboBookItem(
     val author: String = "",
     val folderPath: String,
     val size: Long,
-    val format: String
+    val format: String,
+    val coverPath: String? = null
 )
 
 class KoboBackend(private val context: Context) {
@@ -77,6 +83,7 @@ class KoboBackend(private val context: Context) {
     val dataDir: File = File(context.filesDir, "KoboDictManager").apply { mkdirs() }
     val libraryDir: File = File(dataDir, "library").apply { mkdirs() }
     val backupsDir: File = File(dataDir, "backups").apply { mkdirs() }
+    val coversDir: File = File(dataDir, "covers").apply { mkdirs() }
     private val catalogFile: File = File(libraryDir, "catalog.json")
     private val settingsFile: File = File(dataDir, "settings.json")
     private val kepubCacheFile: File = File(dataDir, "kepub_cache.json")
@@ -717,69 +724,273 @@ class KoboBackend(private val context: Context) {
         }
     }
 
-    private fun parseEpubTitleAuthor(zipBytes: ByteArray): Pair<String, String>? {
+    private fun newSafeDocBuilderFactory(): DocumentBuilderFactory {
+        return DocumentBuilderFactory.newInstance().apply {
+            isNamespaceAware = true
+            try {
+                setFeature("http://apache.org/xml/features/disallow-doctype-decl", false)
+                setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+                setFeature("http://xml.org/sax/features/external-general-entities", false)
+                setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun saveCoverThumbnail(imageBytes: ByteArray, outFile: File): Boolean {
         return try {
-            var containerBytes: ByteArray? = null
-            val opfCandidates = LinkedHashMap<String, ByteArray>()
+            val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, opts)
+            val maxDim = 180
+            var sampleSize = 1
+            while (opts.outHeight / sampleSize > maxDim * 2 && opts.outWidth / sampleSize > maxDim * 2) {
+                sampleSize *= 2
+            }
+            val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+            val bmp = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, decodeOpts)
+                ?: return false
+            val ratio = (maxDim.toFloat() / bmp.height.coerceAtLeast(1)).coerceAtMost(1f)
+            val targetW = (bmp.width * ratio).toInt().coerceAtLeast(1)
+            val targetH = (bmp.height * ratio).toInt().coerceAtLeast(1)
+            val scaled = if (ratio < 1f) Bitmap.createScaledBitmap(bmp, targetW, targetH, true) else bmp
+            FileOutputStream(outFile).use { fos ->
+                scaled.compress(Bitmap.CompressFormat.JPEG, 82, fos)
+            }
+            if (scaled !== bmp) scaled.recycle()
+            bmp.recycle()
+            outFile.exists() && outFile.length() > 0
+        } catch (_: Exception) {
+            false
+        }
+    }
 
-            ZipInputStream(ByteArrayInputStream(zipBytes)).use { zis ->
-                while (true) {
-                    val entry = zis.nextEntry ?: break
-                    val lower = entry.name.lowercase()
-                    if (lower == "meta-inf/container.xml") {
-                        containerBytes = zis.readBytes()
-                    } else if (lower.endsWith(".opf")) {
-                        opfCandidates[entry.name] = zis.readBytes()
+    private fun parseEpubMetadataAndCover(
+        zipBytes: ByteArray,
+        coverOutFile: File
+    ): Triple<String, String, Boolean>? {
+        val tempZip = File(context.cacheDir, "epub_meta_${System.nanoTime()}.zip")
+        return try {
+            tempZip.writeBytes(zipBytes)
+            ZipFile(tempZip).use { zf ->
+                fun findZipEntryCaseInsensitive(target: String): java.util.zip.ZipEntry? {
+                    val direct = zf.getEntry(target)
+                    if (direct != null) return direct
+                    val normalized = target.trimStart('/')
+                    val directNorm = zf.getEntry(normalized)
+                    if (directNorm != null) return directNorm
+                    val e = zf.entries()
+                    while (e.hasMoreElements()) {
+                        val ze = e.nextElement()
+                        if (ze.name.equals(normalized, ignoreCase = true)) return ze
                     }
-                    zis.closeEntry()
+                    return null
                 }
-            }
 
-            var targetOpfBytes: ByteArray? = null
-            if (containerBytes != null) {
-                val doc = DocumentBuilderFactory.newInstance().apply {
-                    isNamespaceAware = true
-                }.newDocumentBuilder().parse(ByteArrayInputStream(containerBytes))
-                val rootfiles = doc.getElementsByTagName("rootfile")
-                if (rootfiles.length > 0) {
-                    val fullPath = rootfiles.item(0).attributes?.getNamedItem("full-path")?.nodeValue
-                    if (!fullPath.isNullOrEmpty()) {
-                        targetOpfBytes = opfCandidates[fullPath]
-                            ?: opfCandidates.entries.firstOrNull { it.key.equals(fullPath, ignoreCase = true) }?.value
+                val dbf = newSafeDocBuilderFactory()
+                var opfPath: String? = null
+                val containerEntry = findZipEntryCaseInsensitive("META-INF/container.xml")
+                if (containerEntry != null) {
+                    try {
+                        val cBytes = zf.getInputStream(containerEntry).use { it.readBytes() }
+                        val doc = dbf.newDocumentBuilder().parse(ByteArrayInputStream(cBytes))
+                        val rootfiles = doc.getElementsByTagName("rootfile")
+                        if (rootfiles.length > 0) {
+                            val raw = rootfiles.item(0).attributes?.getNamedItem("full-path")?.nodeValue
+                            if (!raw.isNullOrBlank()) {
+                                opfPath = try {
+                                    URLDecoder.decode(raw, "UTF-8")
+                                } catch (_: Exception) {
+                                    raw
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {
                     }
                 }
-            }
-            if (targetOpfBytes == null) {
-                targetOpfBytes = opfCandidates.values.firstOrNull()
-            }
-            if (targetOpfBytes == null) return null
 
-            val opfDoc = DocumentBuilderFactory.newInstance().apply {
-                isNamespaceAware = true
-            }.newDocumentBuilder().parse(ByteArrayInputStream(targetOpfBytes))
+                val opfEntry = if (opfPath != null) {
+                    findZipEntryCaseInsensitive(opfPath)
+                } else {
+                    var found: java.util.zip.ZipEntry? = null
+                    val e = zf.entries()
+                    while (e.hasMoreElements()) {
+                        val ze = e.nextElement()
+                        if (ze.name.lowercase().endsWith(".opf")) {
+                            found = ze
+                            break
+                        }
+                    }
+                    found
+                } ?: return null
 
-            fun firstTagText(localName: String): String {
-                val nodesNs = opfDoc.getElementsByTagNameNS("*", localName)
-                if (nodesNs.length > 0) return nodesNs.item(0).textContent?.trim().orEmpty()
-                val nodesDc = opfDoc.getElementsByTagName("dc:$localName")
-                if (nodesDc.length > 0) return nodesDc.item(0).textContent?.trim().orEmpty()
-                val nodesPlain = opfDoc.getElementsByTagName(localName)
-                if (nodesPlain.length > 0) return nodesPlain.item(0).textContent?.trim().orEmpty()
-                return ""
+                val opfDir = opfEntry.name.substringBeforeLast('/', "")
+                val opfBytes = zf.getInputStream(opfEntry).use { it.readBytes() }
+                val opfDoc = dbf.newDocumentBuilder().parse(ByteArrayInputStream(opfBytes))
+
+                fun firstTagText(localName: String): String {
+                    val nodesNs = opfDoc.getElementsByTagNameNS("*", localName)
+                    if (nodesNs.length > 0) return nodesNs.item(0).textContent?.trim().orEmpty()
+                    val nodesDc = opfDoc.getElementsByTagName("dc:$localName")
+                    if (nodesDc.length > 0) return nodesDc.item(0).textContent?.trim().orEmpty()
+                    val nodesPlain = opfDoc.getElementsByTagName(localName)
+                    if (nodesPlain.length > 0) return nodesPlain.item(0).textContent?.trim().orEmpty()
+                    return ""
+                }
+
+                val title = firstTagText("title")
+                val author = firstTagText("creator")
+
+                // Buscar portada en el manifest del OPF
+                var coverId: String? = null
+                val metas = opfDoc.getElementsByTagName("meta")
+                for (i in 0 until metas.length) {
+                    val attrs = metas.item(i).attributes ?: continue
+                    val mName = attrs.getNamedItem("name")?.nodeValue
+                    if (mName.equals("cover", ignoreCase = true)) {
+                        coverId = attrs.getNamedItem("content")?.nodeValue
+                        break
+                    }
+                }
+
+                var coverHref: String? = null
+                var fallbackCoverHref: String? = null
+                val items = opfDoc.getElementsByTagName("item")
+                for (i in 0 until items.length) {
+                    val attrs = items.item(i).attributes ?: continue
+                    val id = attrs.getNamedItem("id")?.nodeValue ?: ""
+                    val href = attrs.getNamedItem("href")?.nodeValue ?: continue
+                    val props = attrs.getNamedItem("properties")?.nodeValue ?: ""
+                    val mediaType = attrs.getNamedItem("media-type")?.nodeValue ?: ""
+
+                    if (props.contains("cover-image", ignoreCase = true) ||
+                        (coverId != null && id == coverId)
+                    ) {
+                        coverHref = href
+                        break
+                    }
+                    if (fallbackCoverHref == null &&
+                        mediaType.startsWith("image/", ignoreCase = true) &&
+                        (id.contains("cover", ignoreCase = true) || href.contains("cover", ignoreCase = true))
+                    ) {
+                        fallbackCoverHref = href
+                    }
+                }
+                val chosenHref = coverHref ?: fallbackCoverHref
+                var hasCover = false
+                if (!chosenHref.isNullOrBlank()) {
+                    val decodedHref = try {
+                        URLDecoder.decode(chosenHref, "UTF-8")
+                    } catch (_: Exception) {
+                        chosenHref
+                    }.trimStart('/')
+                    val fullCoverPath = if (opfDir.isEmpty()) decodedHref else "$opfDir/$decodedHref"
+                    val coverEntry = findZipEntryCaseInsensitive(fullCoverPath)
+                        ?: findZipEntryCaseInsensitive(decodedHref)
+                    if (coverEntry != null) {
+                        val imgBytes = zf.getInputStream(coverEntry).use { it.readBytes() }
+                        hasCover = saveCoverThumbnail(imgBytes, coverOutFile)
+                    }
+                }
+
+                if (title.isEmpty() && author.isEmpty() && !hasCover) null
+                else Triple(title, author, hasCover)
             }
-
-            val title = firstTagText("title")
-            val author = firstTagText("creator")
-            if (title.isEmpty() && author.isEmpty()) null else Pair(title, author)
         } catch (_: Exception) {
             null
+        } finally {
+            if (tempZip.exists()) tempZip.delete()
         }
+    }
+
+    private fun loadSqliteMetadataFallback(vol: Fat32Volume): Map<String, Pair<String, String>> {
+        val dbEntry = vol.findEntry(".kobo/KoboReader.sqlite") ?: return emptyMap()
+        val tempDb = File(context.cacheDir, "kobo_reader_tmp_${System.nanoTime()}.sqlite")
+        val map = HashMap<String, Pair<String, String>>()
+        try {
+            vol.copyFileToLocal(dbEntry, tempDb)
+            SQLiteDatabase.openDatabase(tempDb.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+                db.rawQuery(
+                    "SELECT ContentID, Title, Attribution FROM content WHERE ContentType = '6' AND Title IS NOT NULL",
+                    null
+                ).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val contentId = cursor.getString(0) ?: continue
+                        val title = cursor.getString(1)?.trim().orEmpty()
+                        val author = cursor.getString(2)?.trim().orEmpty()
+                        if (title.isNotEmpty()) {
+                            val key = contentId.substringAfterLast('/').substringAfterLast(':')
+                            map[key.lowercase()] = Pair(title, author)
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        } finally {
+            if (tempDb.exists()) tempDb.delete()
+        }
+        return map
     }
 
     @Synchronized
     fun listKoboBooks(): List<KoboBookItem> {
         val vol = activeVolume ?: return emptyList()
         val result = ArrayList<KoboBookItem>()
+        val cache = loadKepubCache()
+        var cacheDirty = false
+
+        fun processBookEntry(
+            entry: Fat32Entry,
+            dirPath: String,
+            format: String,
+            isKepubOrEpub: Boolean
+        ) {
+            var title = ""
+            var author = ""
+            var coverPath: String? = null
+
+            if (isKepubOrEpub) {
+                val cacheKey = "v2_${entry.name}_${entry.size}"
+                val coverFile = File(coversDir, "${cacheKey.hashCode().toUInt()}.jpg")
+                val cached = cache.optJSONObject(cacheKey)
+                if (cached != null) {
+                    title = cached.optString("title", "")
+                    author = cached.optString("author", "")
+                    if (cached.optBoolean("hasCover", false) && coverFile.exists()) {
+                        coverPath = coverFile.absolutePath
+                    }
+                } else {
+                    try {
+                        val bytes = vol.readFileBytes(entry)
+                        val parsed = parseEpubMetadataAndCover(bytes, coverFile)
+                        if (parsed != null) {
+                            title = parsed.first
+                            author = parsed.second
+                            val hasCover = parsed.third && coverFile.exists()
+                            if (hasCover) coverPath = coverFile.absolutePath
+                            cache.put(cacheKey, JSONObject().apply {
+                                put("title", title)
+                                put("author", author)
+                                put("hasCover", hasCover)
+                            })
+                            cacheDirty = true
+                        }
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+
+            result.add(
+                KoboBookItem(
+                    name = entry.name,
+                    displayTitle = title.ifEmpty { entry.name },
+                    author = author,
+                    folderPath = dirPath,
+                    size = entry.size,
+                    format = format,
+                    coverPath = coverPath
+                )
+            )
+        }
 
         fun scanDir(dirCluster: Long, dirPath: String, depth: Int) {
             if (depth > 2) return
@@ -802,16 +1013,8 @@ class KoboBackend(private val context: Context) {
                 } else {
                     val fmt = detectBookFormat(entry.name)
                     if (fmt != null) {
-                        result.add(
-                            KoboBookItem(
-                                name = entry.name,
-                                displayTitle = entry.name,
-                                author = "",
-                                folderPath = dirPath,
-                                size = entry.size,
-                                format = fmt
-                            )
-                        )
+                        val isEpub = (fmt == "EPUB" || fmt == "KEPUB")
+                        processBookEntry(entry, dirPath, fmt, isEpub)
                     }
                 }
             }
@@ -820,7 +1023,7 @@ class KoboBackend(private val context: Context) {
         // 1. Escanear carpetas visibles del usuario (raíz, /Books, etc.)
         scanDir(vol.rootCluster, "", 0)
 
-        // 2. Escanear .kobo/kepub (libros descargados de Kobo Store / Kobo Cloud sin extensión)
+        // 2. Escanear .kobo/kepub (libros de Kobo Store / Kobo Cloud)
         val kepubDir = vol.findEntry(".kobo/kepub")
         if (kepubDir != null && kepubDir.isDirectory) {
             val kepubEntries = try {
@@ -828,50 +1031,42 @@ class KoboBackend(private val context: Context) {
             } catch (_: Exception) {
                 emptyList()
             }
-            val cache = loadKepubCache()
-            var cacheDirty = false
-
             for (entry in kepubEntries) {
                 if (entry.isDirectory || entry.name.startsWith(".") || entry.size < 2048L) continue
-                val cacheKey = "${entry.name}_${entry.size}"
-                var title = ""
-                var author = ""
-                val cached = cache.optJSONObject(cacheKey)
-                if (cached != null) {
-                    title = cached.optString("title", "")
-                    author = cached.optString("author", "")
-                } else {
-                    try {
-                        val bytes = vol.readFileBytes(entry)
-                        val parsed = parseEpubTitleAuthor(bytes)
-                        if (parsed != null) {
-                            title = parsed.first
-                            author = parsed.second
+                processBookEntry(entry, ".kobo/kepub", "KOBO", isKepubOrEpub = true)
+            }
+        }
+
+        // 3. Fallback con KoboReader.sqlite si algún libro de .kobo/kepub no pudo leerse (ej. DRM)
+        val missingMetadata = result.any { it.folderPath == ".kobo/kepub" && it.displayTitle == it.name }
+        if (missingMetadata) {
+            val sqlMap = loadSqliteMetadataFallback(vol)
+            if (sqlMap.isNotEmpty()) {
+                for (i in result.indices) {
+                    val item = result[i]
+                    if (item.folderPath == ".kobo/kepub" && item.displayTitle == item.name) {
+                        val sqlMeta = sqlMap[item.name.lowercase()]
+                            ?: sqlMap.entries.firstOrNull { it.key.contains(item.name.lowercase()) }?.value
+                        if (sqlMeta != null) {
+                            result[i] = item.copy(
+                                displayTitle = sqlMeta.first,
+                                author = sqlMeta.second
+                            )
+                            val cacheKey = "v2_${item.name}_${item.size}"
                             cache.put(cacheKey, JSONObject().apply {
-                                put("title", title)
-                                put("author", author)
+                                put("title", sqlMeta.first)
+                                put("author", sqlMeta.second)
+                                put("hasCover", false)
                             })
                             cacheDirty = true
                         }
-                    } catch (_: Exception) {
                     }
                 }
-
-                result.add(
-                    KoboBookItem(
-                        name = entry.name,
-                        displayTitle = title.ifEmpty { entry.name },
-                        author = author,
-                        folderPath = ".kobo/kepub",
-                        size = entry.size,
-                        format = "KOBO"
-                    )
-                )
             }
+        }
 
-            if (cacheDirty) {
-                saveKepubCache(cache)
-            }
+        if (cacheDirty) {
+            saveKepubCache(cache)
         }
 
         return result.sortedBy { it.displayTitle.lowercase() }
