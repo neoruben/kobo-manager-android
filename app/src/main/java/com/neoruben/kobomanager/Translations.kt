@@ -15,8 +15,8 @@ data class FactorySpec(val sha256: String, val size: Long)
 data class SlotInfo(val slot: String, val name: String)
 
 val SUPPORTED_LANGUAGES = linkedMapOf(
-    "es" to "Español",
     "en" to "English",
+    "es" to "Español",
     "ca" to "Català",
     "fr" to "Français",
     "de" to "Deutsch",
@@ -77,7 +77,7 @@ val KNOWN_HASHES = mapOf(
 
 val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
     "es" to mapOf(
-        "app_title" to "Kobo DictManager",
+        "app_title" to "Kobodroid",
         "searching" to "⏳ Buscando lector Kobo...",
         "connected" to "🟢 {model} ({drive}) • Idioma: {kobo_lang}",
         "waiting_usb" to "🟠 Esperando conexión USB-C / OTG...",
@@ -149,10 +149,14 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "book_deleted_status" to "Libro eliminado: {name}",
         "loading_books_title" to "Cargando biblioteca...",
         "scanning_directories" to "Buscando libros en el lector...",
-        "scanning_books_progress" to "Leyendo libro {current} de {total} ({pct}%)"
+        "scanning_books_progress" to "Leyendo libro {current} de {total} ({pct}%)",
+        "empty_folder" to "Carpeta vacía",
+        "books_loaded_status" to "{count} libro(s) en Kobo",
+        "books_uploaded_status" to "{count} libro(s) cargado(s) OK",
+        "dict_deleted_status" to "Eliminado: {name}"
     ),
     "en" to mapOf(
-        "app_title" to "Kobo DictManager",
+        "app_title" to "Kobodroid",
         "searching" to "⏳ Searching for Kobo reader...",
         "connected" to "🟢 {model} ({drive}) • Lang: {kobo_lang}",
         "waiting_usb" to "🟠 Waiting for USB-C / OTG connection...",
@@ -224,10 +228,14 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "book_deleted_status" to "Book deleted: {name}",
         "loading_books_title" to "Loading library...",
         "scanning_directories" to "Searching books on eReader...",
-        "scanning_books_progress" to "Reading book {current} of {total} ({pct}%)"
+        "scanning_books_progress" to "Reading book {current} of {total} ({pct}%)",
+        "empty_folder" to "Empty folder",
+        "books_loaded_status" to "{count} book(s) on Kobo",
+        "books_uploaded_status" to "{count} book(s) uploaded OK",
+        "dict_deleted_status" to "Deleted: {name}"
     ),
     "ca" to mapOf(
-        "app_title" to "Kobo DictManager",
+        "app_title" to "Kobodroid",
         "searching" to "⏳ Cercant lector Kobo...",
         "connected" to "🟢 {model} ({drive}) • Idioma: {kobo_lang}",
         "waiting_usb" to "🟠 Esperant connexió USB-C / OTG...",
@@ -299,10 +307,14 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "book_deleted_status" to "Llibre eliminat: {name}",
         "loading_books_title" to "Carregant biblioteca...",
         "scanning_directories" to "Cercant llibres al lector...",
-        "scanning_books_progress" to "Llegint llibre {current} de {total} ({pct}%)"
+        "scanning_books_progress" to "Llegint llibre {current} de {total} ({pct}%)",
+        "empty_folder" to "Carpeta buida",
+        "books_loaded_status" to "{count} llibre(s) al Kobo",
+        "books_uploaded_status" to "{count} llibre(s) carregat(s) OK",
+        "dict_deleted_status" to "Suprimit: {name}"
     ),
     "fr" to mapOf(
-        "app_title" to "Kobo DictManager",
+        "app_title" to "Kobodroid",
         "searching" to "⏳ Recherche du lecteur Kobo...",
         "connected" to "🟢 {model} ({drive}) • Langue: {kobo_lang}",
         "waiting_usb" to "🟠 En attente de connexion USB-C / OTG...",
@@ -374,10 +386,14 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "book_deleted_status" to "Livre supprimé : {name}",
         "loading_books_title" to "Chargement de la bibliothèque...",
         "scanning_directories" to "Recherche de livres sur la liseuse...",
-        "scanning_books_progress" to "Lecture du livre {current} sur {total} ({pct}%)"
+        "scanning_books_progress" to "Lecture du livre {current} sur {total} ({pct}%)",
+        "empty_folder" to "Dossier vide",
+        "books_loaded_status" to "{count} livre(s) sur Kobo",
+        "books_uploaded_status" to "{count} livre(s) téléversé(s) OK",
+        "dict_deleted_status" to "Supprimé : {name}"
     ),
     "de" to mapOf(
-        "app_title" to "Kobo DictManager",
+        "app_title" to "Kobodroid",
         "searching" to "⏳ Kobo-Reader wird gesucht...",
         "connected" to "🟢 {model} ({drive}) • Sprache: {kobo_lang}",
         "waiting_usb" to "🟠 Warte auf USB-C / OTG-Verbindung...",
@@ -449,10 +465,14 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "book_deleted_status" to "Buch gelöscht: {name}",
         "loading_books_title" to "Bibliothek wird geladen...",
         "scanning_directories" to "Bücher auf dem eReader suchen...",
-        "scanning_books_progress" to "Lese Buch {current} von {total} ({pct}%)"
+        "scanning_books_progress" to "Lese Buch {current} von {total} ({pct}%)",
+        "empty_folder" to "Leerer Ordner",
+        "books_loaded_status" to "{count} Buch/Bücher auf Kobo",
+        "books_uploaded_status" to "{count} Buch/Bücher hochgeladen OK",
+        "dict_deleted_status" to "Gelöscht: {name}"
     ),
     "it" to mapOf(
-        "app_title" to "Kobo DictManager",
+        "app_title" to "Kobodroid",
         "searching" to "⏳ Ricerca lettore Kobo...",
         "connected" to "🟢 {model} ({drive}) • Lingua: {kobo_lang}",
         "waiting_usb" to "🟠 In attesa di connessione USB-C / OTG...",
@@ -524,10 +544,14 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "book_deleted_status" to "Libro eliminato: {name}",
         "loading_books_title" to "Caricamento libreria...",
         "scanning_directories" to "Ricerca libri sull'eReader...",
-        "scanning_books_progress" to "Lettura libro {current} di {total} ({pct}%)"
+        "scanning_books_progress" to "Lettura libro {current} di {total} ({pct}%)",
+        "empty_folder" to "Cartella vuota",
+        "books_loaded_status" to "{count} libro/i su Kobo",
+        "books_uploaded_status" to "{count} libro/i caricato/i OK",
+        "dict_deleted_status" to "Eliminato: {name}"
     ),
     "pt" to mapOf(
-        "app_title" to "Kobo DictManager",
+        "app_title" to "Kobodroid",
         "searching" to "⏳ Procurando leitor Kobo...",
         "connected" to "🟢 {model} ({drive}) • Idioma: {kobo_lang}",
         "waiting_usb" to "🟠 Aguardando conexão USB-C / OTG...",
@@ -599,13 +623,17 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "book_deleted_status" to "Livro excluído: {name}",
         "loading_books_title" to "Carregando biblioteca...",
         "scanning_directories" to "Procurando livros no eReader...",
-        "scanning_books_progress" to "Lendo livro {current} de {total} ({pct}%)"
+        "scanning_books_progress" to "Lendo livro {current} de {total} ({pct}%)",
+        "empty_folder" to "Pasta vazia",
+        "books_loaded_status" to "{count} livro(s) no Kobo",
+        "books_uploaded_status" to "{count} livro(s) enviado(s) OK",
+        "dict_deleted_status" to "Excluído: {name}"
     )
 )
 
 fun detectSystemLanguage(): String {
     val code = Locale.getDefault().language.lowercase()
-    return if (SUPPORTED_LANGUAGES.containsKey(code)) code else "es"
+    return if (SUPPORTED_LANGUAGES.containsKey(code)) code else "en"
 }
 
 fun tr(lang: String, key: String, vararg args: Pair<String, String>): String {

@@ -513,7 +513,7 @@ fun KobodroidSingleScreen(
                     }
                     alertTitle = tr(lang, "upload_books_success_title")
                     alertMessage = msg
-                    statusText = "$uploadedCount libro(s) OK."
+                    statusText = tr(lang, "books_uploaded_status", "count" to uploadedCount.toString())
                 } else if (errors.isNotEmpty()) {
                     alertTitle = "Error"
                     alertMessage = errors.joinToString("\n")
@@ -744,7 +744,7 @@ fun KobodroidSingleScreen(
                             withContext(Dispatchers.Main) {
                                 isTransferring = false
                                 koboBooks = list
-                                statusText = "${list.size} libro(s) en Kobo"
+                                statusText = tr(lang, "books_loaded_status", "count" to list.size.toString())
                             }
                         }
                     }
@@ -944,7 +944,7 @@ fun KobodroidSingleScreen(
                                         confirmAction = {
                                             backend.deleteFromCatalog(item.key)
                                             refreshCatalogAndInstalled(currentKobo)
-                                            statusText = "Eliminado: ${item.name}"
+                                            statusText = tr(lang, "dict_deleted_status", "name" to item.name)
                                         }
                                     }
                                 )
@@ -1121,7 +1121,7 @@ fun KobodroidSingleScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (folderFiles.isEmpty()) {
-                        Text("Vacío", fontSize = 13.sp, color = palette.textSecondary)
+                        Text(tr(lang, "empty_folder"), fontSize = 13.sp, color = palette.textSecondary)
                     } else {
                         for (f in folderFiles.take(10)) {
                             Row(
