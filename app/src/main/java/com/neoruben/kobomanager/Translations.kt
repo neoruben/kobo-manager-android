@@ -153,7 +153,15 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "empty_folder" to "Carpeta vacía",
         "books_loaded_status" to "{count} libro(s) en Kobo",
         "books_uploaded_status" to "{count} libro(s) cargado(s) OK",
-        "dict_deleted_status" to "Eliminado: {name}"
+        "dict_deleted_status" to "Eliminado: {name}",
+        "update_available_title" to "Nueva versión disponible",
+        "update_available_msg" to "Hay una nueva versión de Kobodroid disponible:\n\n• Última versión: {latest}\n• Tu versión actual: v{current}\n\n¿Deseas descargar la actualización desde GitHub?",
+        "up_to_date_title" to "Kobodroid actualizado",
+        "up_to_date_msg" to "Ya tienes instalada la versión más reciente (v{version}).\n\n¿Deseas visitar el repositorio de GitHub?",
+        "update_check_failed_title" to "Comprobación de versión",
+        "update_check_failed_msg" to "No se pudo conectar con GitHub para comprobar actualizaciones (sin conexión o repositorio privado).\n\n¿Deseas abrir la página de descargas en el navegador?",
+        "download_update_btn" to "Descargar APK",
+        "visit_github_btn" to "Ver en GitHub"
     ),
     "en" to mapOf(
         "app_title" to "Kobodroid",
@@ -232,7 +240,15 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "empty_folder" to "Empty folder",
         "books_loaded_status" to "{count} book(s) on Kobo",
         "books_uploaded_status" to "{count} book(s) uploaded OK",
-        "dict_deleted_status" to "Deleted: {name}"
+        "dict_deleted_status" to "Deleted: {name}",
+        "update_available_title" to "New version available",
+        "update_available_msg" to "A new version of Kobodroid is available:\n\n• Latest version: {latest}\n• Your version: v{current}\n\nWould you like to download the update from GitHub?",
+        "up_to_date_title" to "Kobodroid is up to date",
+        "up_to_date_msg" to "You already have the latest version installed (v{version}).\n\nWould you like to visit the GitHub repository?",
+        "update_check_failed_title" to "Version Check",
+        "update_check_failed_msg" to "Could not connect to GitHub to check for updates (no connection or private repository).\n\nWould you like to open the releases page in your browser?",
+        "download_update_btn" to "Download APK",
+        "visit_github_btn" to "View on GitHub"
     ),
     "ca" to mapOf(
         "app_title" to "Kobodroid",
@@ -311,7 +327,15 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "empty_folder" to "Carpeta buida",
         "books_loaded_status" to "{count} llibre(s) al Kobo",
         "books_uploaded_status" to "{count} llibre(s) carregat(s) OK",
-        "dict_deleted_status" to "Suprimit: {name}"
+        "dict_deleted_status" to "Suprimit: {name}",
+        "update_available_title" to "Nova versió disponible",
+        "update_available_msg" to "Hi ha una nova versió de Kobodroid disponible:\n\n• Darrera versió: {latest}\n• La teva versió: v{current}\n\nVols descarregar l'actualització des de GitHub?",
+        "up_to_date_title" to "Kobodroid està actualitzat",
+        "up_to_date_msg" to "Ja tens instal·lada la versió més recent (v{version}).\n\nVols visitar el repositori a GitHub?",
+        "update_check_failed_title" to "Comprovació de versió",
+        "update_check_failed_msg" to "No s'ha pogut connectar amb GitHub per comprovar actualitzacions (sense connexió o repositori privat).\n\nVols obrir la pàgina de descàrregues al navegador?",
+        "download_update_btn" to "Descarregar APK",
+        "visit_github_btn" to "Veure a GitHub"
     ),
     "fr" to mapOf(
         "app_title" to "Kobodroid",
@@ -390,7 +414,15 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "empty_folder" to "Dossier vide",
         "books_loaded_status" to "{count} livre(s) sur Kobo",
         "books_uploaded_status" to "{count} livre(s) téléversé(s) OK",
-        "dict_deleted_status" to "Supprimé : {name}"
+        "dict_deleted_status" to "Supprimé : {name}",
+        "update_available_title" to "Nouvelle version disponible",
+        "update_available_msg" to "Une nouvelle version de Kobodroid est disponible :\n\n• Dernière version : {latest}\n• Votre version : v{current}\n\nSouhaitez-vous télécharger la mise à jour depuis GitHub ?",
+        "up_to_date_title" to "Kobodroid est à jour",
+        "up_to_date_msg" to "Vous avez déjà installé la version la plus récente (v{version}).\n\nSouhaitez-vous visiter le dépôt sur GitHub ?",
+        "update_check_failed_title" to "Vérification de version",
+        "update_check_failed_msg" to "Impossible de vérifier les mises à jour sur GitHub (pas de connexion ou dépôt privé).\n\nSouhaitez-vous ouvrir la page des téléchargements dans le navigateur ?",
+        "download_update_btn" to "Télécharger APK",
+        "visit_github_btn" to "Voir sur GitHub"
     ),
     "de" to mapOf(
         "app_title" to "Kobodroid",
@@ -469,7 +501,15 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "empty_folder" to "Leerer Ordner",
         "books_loaded_status" to "{count} Buch/Bücher auf Kobo",
         "books_uploaded_status" to "{count} Buch/Bücher hochgeladen OK",
-        "dict_deleted_status" to "Gelöscht: {name}"
+        "dict_deleted_status" to "Gelöscht: {name}",
+        "update_available_title" to "Neue Version verfügbar",
+        "update_available_msg" to "Eine neue Version von Kobodroid ist verfügbar:\n\n• Neueste Version: {latest}\n• Ihre Version: v{current}\n\nMöchten Sie das Update von GitHub herunterladen?",
+        "up_to_date_title" to "Kobodroid ist aktuell",
+        "up_to_date_msg" to "Sie haben bereits die neueste Version installiert (v{version}).\n\nMöchten Sie das GitHub-Repository besuchen?",
+        "update_check_failed_title" to "Versionsprüfung",
+        "update_check_failed_msg" to "Verbindung zu GitHub fehlgeschlagen (keine Internetverbindung oder privates Repository).\n\nMöchten Sie die Downloadseite im Browser öffnen?",
+        "download_update_btn" to "APK herunterladen",
+        "visit_github_btn" to "Auf GitHub ansehen"
     ),
     "it" to mapOf(
         "app_title" to "Kobodroid",
@@ -548,7 +588,15 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "empty_folder" to "Cartella vuota",
         "books_loaded_status" to "{count} libro/i su Kobo",
         "books_uploaded_status" to "{count} libro/i caricato/i OK",
-        "dict_deleted_status" to "Eliminato: {name}"
+        "dict_deleted_status" to "Eliminato: {name}",
+        "update_available_title" to "Nuova versione disponible",
+        "update_available_msg" to "È disponibile una nuova versione di Kobodroid:\n\n• Ultima versione: {latest}\n• La tua versione: v{current}\n\nVuoi scaricare l'aggiornamento da GitHub?",
+        "up_to_date_title" to "Kobodroid è aggiornato",
+        "up_to_date_msg" to "Hai già installato la versione più recente (v{version}).\n\nVuoi visitare il repository su GitHub?",
+        "update_check_failed_title" to "Controllo versione",
+        "update_check_failed_msg" to "Impossibile connettersi a GitHub per verificare gli aggiornamenti (nessuna connessione o repository privato).\n\nVuoi aprire la pagina dei download nel browser?",
+        "download_update_btn" to "Scarica APK",
+        "visit_github_btn" to "Visualizza su GitHub"
     ),
     "pt" to mapOf(
         "app_title" to "Kobodroid",
@@ -627,7 +675,15 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "empty_folder" to "Pasta vazia",
         "books_loaded_status" to "{count} livro(s) no Kobo",
         "books_uploaded_status" to "{count} livro(s) enviado(s) OK",
-        "dict_deleted_status" to "Excluído: {name}"
+        "dict_deleted_status" to "Excluído: {name}",
+        "update_available_title" to "Nova versão disponível",
+        "update_available_msg" to "Uma nova versão do Kobodroid está disponível:\n\n• Versão mais recente: {latest}\n• Sua versão: v{current}\n\nDeseja baixar a atualização do GitHub?",
+        "up_to_date_title" to "Kobodroid está atualizado",
+        "up_to_date_msg" to "Você já tem a versão mais recente instalada (v{version}).\n\nDeseja visitar o repositório no GitHub?",
+        "update_check_failed_title" to "Verificação de versão",
+        "update_check_failed_msg" to "Não foi possível conectar ao GitHub para verificar atualizações (sem conexão ou repositório privado).\n\nDeseja abrir a página de downloads no navegador?",
+        "download_update_btn" to "Baixar APK",
+        "visit_github_btn" to "Ver no GitHub"
     )
 )
 
