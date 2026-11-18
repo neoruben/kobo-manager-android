@@ -254,6 +254,17 @@ fun KobodroidSingleScreen(
     var showFolderDialog by remember { mutableStateOf(false) }
     var folderFiles by remember { mutableStateOf<List<KoboDictFileItem>>(emptyList()) }
 
+    // Comprobación de actualizaciones desde GitHub
+    var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+    var isCheckingUpdate by remember { mutableStateOf(false) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        isCheckingUpdate = true
+        updateInfo = backend.checkForUpdates(APP_VERSION)
+        isCheckingUpdate = false
+    }
+
     fun refreshCatalogAndInstalled(kobo: KoboDeviceInfo?) {
         catalog = backend.loadCatalog()
         installedDict = if (kobo != null) backend.getInstalledPrimaryDict(kobo) else null
@@ -661,6 +672,20 @@ fun KobodroidSingleScreen(
         TopKoboHeaderBar(
             lang = lang,
             palette = palette,
+            updateInfo = updateInfo,
+            isCheckingUpdate = isCheckingUpdate,
+            onVersionClick = {
+                if (updateInfo != null) {
+                    showUpdateDialog = true
+                } else {
+                    scope.launch {
+                        isCheckingUpdate = true
+                        updateInfo = backend.checkForUpdates(APP_VERSION)
+                        isCheckingUpdate = false
+                        showUpdateDialog = true
+                    }
+                }
+            },
             onLangSelected = { newLang ->
                 lang = newLang
                 backend.saveLanguagePreference(newLang)
@@ -1156,12 +1181,76 @@ fun KobodroidSingleScreen(
             }
         )
     }
+
+    if (showUpdateDialog) {
+        val info = updateInfo
+        val hasUpdate = info?.isUpdateAvailable == true
+        val title = when {
+            hasUpdate -> tr(lang, "update_available_title")
+            info != null -> tr(lang, "up_to_date_title")
+            else -> tr(lang, "update_check_failed_title")
+        }
+        val message = when {
+            hasUpdate -> tr(lang, "update_available_msg", "latest" to info!!.latestVersion, "current" to APP_VERSION)
+            info != null -> tr(lang, "up_to_date_msg", "version" to APP_VERSION)
+            else -> tr(lang, "update_check_failed_msg")
+        }
+        val confirmBtnText = when {
+            hasUpdate -> tr(lang, "download_update_btn")
+            else -> tr(lang, "visit_github_btn")
+        }
+        val targetUrl = info?.releaseUrl ?: "https://github.com/neoruben/kobo-manager-android/releases"
+
+        AlertDialog(
+            onDismissRequest = { showUpdateDialog = false },
+            containerColor = palette.cardBg,
+            titleContentColor = palette.textPrimary,
+            textContentColor = palette.textSecondary,
+            title = {
+                Text(
+                    text = if (hasUpdate) "🚀 $title" else "ℹ️ $title",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp
+                )
+            },
+            text = {
+                Text(
+                    text = message,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showUpdateDialog = false
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl))
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = palette.koboRed)
+                ) {
+                    Text(confirmBtnText, color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUpdateDialog = false }) {
+                    Text(tr(lang, "close_btn"), color = palette.textSecondary)
+                }
+            }
+        )
+    }
 }
 
 @Composable
 private fun TopKoboHeaderBar(
     lang: String,
     palette: KoboPalette,
+    updateInfo: UpdateInfo?,
+    isCheckingUpdate: Boolean,
+    onVersionClick: () -> Unit,
     onLangSelected: (String) -> Unit,
     onToggleTheme: () -> Unit
 ) {
@@ -1207,18 +1296,40 @@ private fun TopKoboHeaderBar(
                 color = palette.textPrimary
             )
             Spacer(modifier = Modifier.width(6.dp))
+            val hasUpdate = updateInfo?.isUpdateAvailable == true
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(palette.koboRedSoft)
-                    .padding(horizontal = 5.dp, vertical = 2.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (hasUpdate) palette.koboRed else palette.koboRedSoft)
+                    .clickable { onVersionClick() }
+                    .padding(horizontal = 6.dp, vertical = 3.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "v$APP_VERSION",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = palette.koboRed
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (hasUpdate) {
+                        Text(
+                            text = "⬆ ",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                    }
+                    Text(
+                        text = "v$APP_VERSION",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (hasUpdate) Color.White else palette.koboRed
+                    )
+                    if (hasUpdate) {
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(Color.White)
+                        )
+                    }
+                }
             }
         }
 

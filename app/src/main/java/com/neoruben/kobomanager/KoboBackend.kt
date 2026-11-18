@@ -24,6 +24,17 @@ import java.util.Locale
 import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 import javax.xml.parsers.DocumentBuilderFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
+
+data class UpdateInfo(
+    val isUpdateAvailable: Boolean,
+    val latestVersion: String,
+    val currentVersion: String = APP_VERSION,
+    val releaseUrl: String = "https://github.com/neoruben/kobo-manager-android/releases/latest"
+)
 
 data class KoboDeviceInfo(
     val drive: String,
@@ -1167,5 +1178,53 @@ class KoboBackend(private val context: Context) {
         activeBlockDevice = null
         activeVolume = null
         activeUsbDeviceName = null
+    }
+
+    // -------------------------------------------------------------------------
+    // Comprobación de actualizaciones desde GitHub Releases
+    // -------------------------------------------------------------------------
+    suspend fun checkForUpdates(currentVersion: String = APP_VERSION): UpdateInfo? = withContext(Dispatchers.IO) {
+        try {
+            val url = URL("https://api.github.com/repos/neoruben/kobo-manager-android/releases/latest")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                setRequestProperty("User-Agent", "Kobodroid-App")
+                setRequestProperty("Accept", "application/vnd.github.v3+json")
+                connectTimeout = 4000
+                readTimeout = 4000
+            }
+            if (conn.responseCode == 200) {
+                val body = conn.inputStream.bufferedReader(StandardCharsets.UTF_8).use { it.readText() }
+                val json = JSONObject(body)
+                val tagName = json.optString("tag_name", "").trim()
+                val htmlUrl = json.optString("html_url", "https://github.com/neoruben/kobo-manager-android/releases/latest")
+                val cleanTag = tagName.removePrefix("v").removePrefix("V")
+                val cleanCurrent = currentVersion.removePrefix("v").removePrefix("V")
+                val hasUpdate = isNewerVersion(cleanTag, cleanCurrent)
+                UpdateInfo(
+                    isUpdateAvailable = hasUpdate,
+                    latestVersion = tagName,
+                    currentVersion = currentVersion,
+                    releaseUrl = htmlUrl
+                )
+            } else {
+                null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun isNewerVersion(latest: String, current: String): Boolean {
+        val lParts = latest.split('.').mapNotNull { it.toIntOrNull() }
+        val cParts = current.split('.').mapNotNull { it.toIntOrNull() }
+        val maxLen = maxOf(lParts.size, cParts.size)
+        for (i in 0 until maxLen) {
+            val l = lParts.getOrElse(i) { 0 }
+            val c = cParts.getOrElse(i) { 0 }
+            if (l > c) return true
+            if (l < c) return false
+        }
+        return false
     }
 }
