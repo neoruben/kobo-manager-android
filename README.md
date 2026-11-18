@@ -44,7 +44,7 @@ Transfer books (EPUB, KEPUB, PDF, CBZ), browse your library with book covers and
 
 ## 📱 Installation
 
-1. Download **`Kobodroid-v1.3.3.apk`** from the **[Releases](https://github.com/neoruben/kobo-manager-android/releases/latest)** page.
+1. Download **`Kobodroid-v1.3.4.apk`** from the **[Releases](https://github.com/neoruben/kobo-manager-android/releases/latest)** page.
 2. Install it on your Android device (Android 8.0 / API 26 or higher).
 3. Connect your Kobo eReader using a USB-C or USB OTG cable, tap **"Connect"** on the Kobo screen, and manage your library.
 
@@ -124,7 +124,7 @@ Permite transferir libros (EPUB, KEPUB, PDF, CBZ), explorar tu biblioteca con po
 
 ### 📱 Instalación
 
-1. Descarga **`Kobodroid-v1.3.3.apk`** desde la sección de **[Releases](https://github.com/neoruben/kobo-manager-android/releases/latest)**.
+1. Descarga **`Kobodroid-v1.3.4.apk`** desde la sección de **[Releases](https://github.com/neoruben/kobo-manager-android/releases/latest)**.
 2. Instálalo en tu móvil Android (Android 8.0 / API 26 o superior).
 3. Conecta tu lector Kobo por cable USB-C o adaptador OTG, pulsa **"Conectar"** en la pantalla del Kobo y gestiona tu biblioteca.
 
