@@ -2,7 +2,7 @@ package com.neoruben.kobomanager
 
 import java.util.Locale
 
-const val APP_VERSION = "1.3.2"
+const val APP_VERSION = "1.3.3"
 
 val OFFICIAL_FACTORY_SPECS = mapOf(
     "dicthtml-es.zip" to FactorySpec(
@@ -146,7 +146,10 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "upload_books_success_msg" to "Se han cargado {count} libro(s) en la carpeta /Books de tu Kobo.\n\nAl pulsar 'Expulsar', el Kobo los importará automáticamente.",
         "confirm_delete_book_title" to "Eliminar libro del Kobo",
         "confirm_delete_book_msg" to "¿Seguro que quieres borrar '{name}' de la memoria del Kobo?",
-        "book_deleted_status" to "Libro eliminado: {name}"
+        "book_deleted_status" to "Libro eliminado: {name}",
+        "loading_books_title" to "Cargando biblioteca...",
+        "scanning_directories" to "Buscando libros en el lector...",
+        "scanning_books_progress" to "Leyendo libro {current} de {total} ({pct}%)"
     ),
     "en" to mapOf(
         "app_title" to "Kobo DictManager",
@@ -218,7 +221,10 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "upload_books_success_msg" to "{count} book(s) uploaded to the /Books folder on your Kobo.\n\nTap 'Eject' so Kobo imports them automatically.",
         "confirm_delete_book_title" to "Delete Book from Kobo",
         "confirm_delete_book_msg" to "Are you sure you want to delete '{name}' from your Kobo storage?",
-        "book_deleted_status" to "Book deleted: {name}"
+        "book_deleted_status" to "Book deleted: {name}",
+        "loading_books_title" to "Loading library...",
+        "scanning_directories" to "Searching books on eReader...",
+        "scanning_books_progress" to "Reading book {current} of {total} ({pct}%)"
     ),
     "ca" to mapOf(
         "app_title" to "Kobo DictManager",
@@ -290,7 +296,10 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "upload_books_success_msg" to "S'han carregat {count} llibre(s) a la carpeta /Books del teu Kobo.\n\nEn prémer 'Expulsar', el Kobo els importarà automàticament.",
         "confirm_delete_book_title" to "Eliminar llibre del Kobo",
         "confirm_delete_book_msg" to "Segur que vols esborrar '{name}' de la memòria del Kobo?",
-        "book_deleted_status" to "Llibre eliminat: {name}"
+        "book_deleted_status" to "Llibre eliminat: {name}",
+        "loading_books_title" to "Carregant biblioteca...",
+        "scanning_directories" to "Cercant llibres al lector...",
+        "scanning_books_progress" to "Llegint llibre {current} de {total} ({pct}%)"
     ),
     "fr" to mapOf(
         "app_title" to "Kobo DictManager",
@@ -362,7 +371,10 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "upload_books_success_msg" to "{count} livre(s) envoyé(s) dans le dossier /Books de votre Kobo.\n\nAppuyez sur 'Éjecter' pour que le Kobo les importe automatiquement.",
         "confirm_delete_book_title" to "Supprimer le livre du Kobo",
         "confirm_delete_book_msg" to "Voulez-vous vraiment supprimer '{name}' de votre Kobo ?",
-        "book_deleted_status" to "Livre supprimé : {name}"
+        "book_deleted_status" to "Livre supprimé : {name}",
+        "loading_books_title" to "Chargement de la bibliothèque...",
+        "scanning_directories" to "Recherche de livres sur la liseuse...",
+        "scanning_books_progress" to "Lecture du livre {current} sur {total} ({pct}%)"
     ),
     "de" to mapOf(
         "app_title" to "Kobo DictManager",
@@ -434,7 +446,10 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "upload_books_success_msg" to "{count} Buch/Bücher in den Ordner /Books Ihres Kobo hochgeladen.\n\nTippen Sie auf 'Auswerfen', damit der Kobo sie automatisch importiert.",
         "confirm_delete_book_title" to "Buch vom Kobo löschen",
         "confirm_delete_book_msg" to "Möchten Sie '{name}' wirklich vom Kobo löschen?",
-        "book_deleted_status" to "Buch gelöscht: {name}"
+        "book_deleted_status" to "Buch gelöscht: {name}",
+        "loading_books_title" to "Bibliothek wird geladen...",
+        "scanning_directories" to "Bücher auf dem eReader suchen...",
+        "scanning_books_progress" to "Lese Buch {current} von {total} ({pct}%)"
     ),
     "it" to mapOf(
         "app_title" to "Kobo DictManager",
@@ -506,7 +521,10 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "upload_books_success_msg" to "{count} libro/i caricati nella cartella /Books del tuo Kobo.\n\nTocca 'Espelli' per importarli automaticamente.",
         "confirm_delete_book_title" to "Elimina libro da Kobo",
         "confirm_delete_book_msg" to "Sei sicuro di voler eliminare '{name}' dalla memoria del Kobo?",
-        "book_deleted_status" to "Libro eliminato: {name}"
+        "book_deleted_status" to "Libro eliminato: {name}",
+        "loading_books_title" to "Caricamento libreria...",
+        "scanning_directories" to "Ricerca libri sull'eReader...",
+        "scanning_books_progress" to "Lettura libro {current} di {total} ({pct}%)"
     ),
     "pt" to mapOf(
         "app_title" to "Kobo DictManager",
@@ -578,7 +596,10 @@ val TRANSLATIONS: Map<String, Map<String, String>> = mapOf(
         "upload_books_success_msg" to "{count} livro(s) enviado(s) para a pasta /Books do seu Kobo.\n\nToque em 'Ejetar' para o Kobo importá-los automaticamente.",
         "confirm_delete_book_title" to "Excluir livro do Kobo",
         "confirm_delete_book_msg" to "Tem certeza que deseja excluir '{name}' da memória do Kobo?",
-        "book_deleted_status" to "Livro excluído: {name}"
+        "book_deleted_status" to "Livro excluído: {name}",
+        "loading_books_title" to "Carregando biblioteca...",
+        "scanning_directories" to "Procurando livros no eReader...",
+        "scanning_books_progress" to "Lendo livro {current} de {total} ({pct}%)"
     )
 )
 

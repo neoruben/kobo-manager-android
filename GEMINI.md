@@ -81,4 +81,5 @@ app/src/main/
 - **`v1.3.0` (`afcd130`..`43a65df`):** Pestaña de Libros con subida/borrado, portadas EPUB, buscador y fallback SQLite.
 - **`v1.3.1` (`e7d8dc2`):** Eliminadas etiquetas superiores redundantes (`FÁBRICA` / `ACTIVO EN KOBO`) en tarjetas de diccionarios para evitar cortes en el título.
 - **`v1.3.2` (`b84b658`):** Añadida ruta completa dentro del eReader (`📁 /carpeta/archivo`) en cada tarjeta de libro, en el buscador y en el diálogo de confirmación de borrado.
-- **Evolución a Kobodroid (`com.neoruben.kobomanager`):** Transición del proyecto a gestor integral Kobo para Android (`kobo-manager-android`), nuevo paquete neutro `com.neoruben.kobomanager`, nombre de aplicación Kobodroid e integración del botón permanente de Ko-fi.
+- **Evolución a Kobodroid (`com.neoruben.kobomanager`):** Transición del proyecto a gestor integral Kobo para Android (`kobo-manager-android`), nuevo paquete neutro `com.neoruben.kobomanager`, nuevo icono oficial (robot Android mordiendo la K) e integración del botón permanente de Ko-fi.
+- **`v1.3.3`:** Barra de progreso en tiempo real con nombre de libro, porcentaje y conteo (`X / Total`) al conectar el lector Kobo y al actualizar la biblioteca.

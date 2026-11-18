@@ -938,12 +938,22 @@ class KoboBackend(private val context: Context) {
         return map
     }
 
+    private data class BookCandidate(
+        val entry: Fat32Entry,
+        val dirPath: String,
+        val format: String,
+        val isKepubOrEpub: Boolean
+    )
+
     @Synchronized
-    fun listKoboBooks(): List<KoboBookItem> {
+    fun listKoboBooks(
+        progressCb: ((current: Int, total: Int, name: String) -> Unit)? = null
+    ): List<KoboBookItem> {
         val vol = activeVolume ?: return emptyList()
         val result = ArrayList<KoboBookItem>()
         val cache = loadKepubCache()
         var cacheDirty = false
+        val candidates = ArrayList<BookCandidate>()
 
         fun processBookEntry(
             entry: Fat32Entry,
@@ -1021,7 +1031,7 @@ class KoboBackend(private val context: Context) {
                     val fmt = detectBookFormat(entry.name)
                     if (fmt != null) {
                         val isEpub = (fmt == "EPUB" || fmt == "KEPUB")
-                        processBookEntry(entry, dirPath, fmt, isEpub)
+                        candidates.add(BookCandidate(entry, dirPath, fmt, isEpub))
                     }
                 }
             }
@@ -1040,13 +1050,20 @@ class KoboBackend(private val context: Context) {
             }
             for (entry in kepubEntries) {
                 if (entry.isDirectory || entry.name.startsWith(".") || entry.size < 2048L) continue
-                processBookEntry(entry, ".kobo/kepub", "KOBO", isKepubOrEpub = true)
+                candidates.add(BookCandidate(entry, ".kobo/kepub", "KOBO", isKepubOrEpub = true))
             }
+        }
+
+        val total = candidates.size
+        for ((idx, cand) in candidates.withIndex()) {
+            progressCb?.invoke(idx + 1, total, cand.entry.name)
+            processBookEntry(cand.entry, cand.dirPath, cand.format, cand.isKepubOrEpub)
         }
 
         // 3. Fallback con KoboReader.sqlite si algún libro de .kobo/kepub no pudo leerse (ej. DRM)
         val missingMetadata = result.any { it.folderPath == ".kobo/kepub" && it.displayTitle == it.name }
         if (missingMetadata) {
+            progressCb?.invoke(total, total, "KoboReader.sqlite")
             val sqlMap = loadSqliteMetadataFallback(vol)
             if (sqlMap.isNotEmpty()) {
                 for (i in result.indices) {

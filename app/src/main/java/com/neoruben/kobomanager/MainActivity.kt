@@ -303,16 +303,39 @@ fun KobodroidSingleScreen(
                 } else {
                     if (currentKobo == null || currentKobo?.usbDevice?.deviceName != candidate.deviceName) {
                         val info = backend.connectOverUsb(usbManager, candidate)
-                        val inst = backend.getInstalledPrimaryDict(info)
-                        val cat = backend.loadCatalog()
-                        val books = if (info != null) backend.listKoboBooks() else emptyList()
-                        withContext(Dispatchers.Main) {
-                            pendingPermissionDevice = null
-                            currentKobo = info
-                            installedDict = inst
-                            catalog = cat
-                            koboBooks = books
-                            if (info != null) {
+                        if (info != null) {
+                            val inst = backend.getInstalledPrimaryDict(info)
+                            val cat = backend.loadCatalog()
+                            withContext(Dispatchers.Main) {
+                                pendingPermissionDevice = null
+                                currentKobo = info
+                                installedDict = inst
+                                catalog = cat
+                                isTransferring = true
+                                progressTitle = tr(lang, "loading_books_title")
+                                progressItemName = tr(lang, "scanning_directories")
+                                progressIndeterminate = true
+                                progressFraction = 0f
+                                progressStatusText = "..."
+                            }
+                            val books = backend.listKoboBooks { current, total, name ->
+                                scope.launch(Dispatchers.Main) {
+                                    progressIndeterminate = false
+                                    val frac = if (total > 0) current.toFloat() / total.toFloat() else 0f
+                                    progressFraction = frac
+                                    progressItemName = name
+                                    progressStatusText = tr(
+                                        lang,
+                                        "scanning_books_progress",
+                                        "current" to current.toString(),
+                                        "total" to total.toString(),
+                                        "pct" to (frac * 100).toInt().toString()
+                                    )
+                                }
+                            }
+                            withContext(Dispatchers.Main) {
+                                isTransferring = false
+                                koboBooks = books
                                 statusText = tr(
                                     lang,
                                     "device_ready_status",
@@ -695,8 +718,31 @@ fun KobodroidSingleScreen(
                                 showFolderDialog = true
                             }
                         } else {
-                            val list = backend.listKoboBooks()
                             withContext(Dispatchers.Main) {
+                                isTransferring = true
+                                progressTitle = tr(lang, "loading_books_title")
+                                progressItemName = tr(lang, "scanning_directories")
+                                progressIndeterminate = true
+                                progressFraction = 0f
+                                progressStatusText = "..."
+                            }
+                            val list = backend.listKoboBooks { current, total, name ->
+                                scope.launch(Dispatchers.Main) {
+                                    progressIndeterminate = false
+                                    val frac = if (total > 0) current.toFloat() / total.toFloat() else 0f
+                                    progressFraction = frac
+                                    progressItemName = name
+                                    progressStatusText = tr(
+                                        lang,
+                                        "scanning_books_progress",
+                                        "current" to current.toString(),
+                                        "total" to total.toString(),
+                                        "pct" to (frac * 100).toInt().toString()
+                                    )
+                                }
+                            }
+                            withContext(Dispatchers.Main) {
+                                isTransferring = false
                                 koboBooks = list
                                 statusText = "${list.size} libro(s) en Kobo"
                             }
