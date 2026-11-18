@@ -1,4 +1,4 @@
-package com.neoruben.kobodictmanager
+package com.neoruben.kobomanager
 
 import java.util.Locale
 

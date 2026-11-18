@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "KoboDictManager"
+rootProject.name = "kobo-manager-android"
 include(":app")

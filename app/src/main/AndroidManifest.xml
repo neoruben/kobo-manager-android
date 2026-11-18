@@ -11,14 +11,14 @@
         android:roundIcon="@drawable/ic_kobo_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.KoboDictManager">
+        android:theme="@style/Theme.Kobodroid">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:screenOrientation="portrait"
-            android:theme="@style/Theme.KoboDictManager">
+            android:theme="@style/Theme.Kobodroid">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

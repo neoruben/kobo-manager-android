@@ -1,4 +1,4 @@
-package com.neoruben.kobodictmanager
+package com.neoruben.kobomanager
 
 import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice

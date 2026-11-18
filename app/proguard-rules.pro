@@ -1,2 +1,2 @@
-# ProGuard rules for Kobo DictManager
--keep class com.neoruben.kobodictmanager.** { *; }
+# ProGuard rules for Kobodroid
+-keep class com.neoruben.kobomanager.** { *; }

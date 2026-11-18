@@ -1,4 +1,4 @@
-package com.neoruben.kobodictmanager
+package com.neoruben.kobomanager
 
 import android.content.Context
 import android.database.Cursor
@@ -80,7 +80,14 @@ data class KoboBookItem(
 
 class KoboBackend(private val context: Context) {
 
-    val dataDir: File = File(context.filesDir, "KoboDictManager").apply { mkdirs() }
+    val dataDir: File = File(context.filesDir, "Kobodroid").let { newDir ->
+        val oldDir = File(context.filesDir, "KoboDictManager")
+        if (oldDir.exists() && !newDir.exists()) {
+            oldDir.renameTo(newDir)
+        }
+        if (!newDir.exists()) newDir.mkdirs()
+        newDir
+    }
     val libraryDir: File = File(dataDir, "library").apply { mkdirs() }
     val backupsDir: File = File(dataDir, "backups").apply { mkdirs() }
     val coversDir: File = File(dataDir, "covers").apply { mkdirs() }

@@ -1,10 +1,11 @@
-package com.neoruben.kobodictmanager
+package com.neoruben.kobomanager
 
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Build
@@ -91,7 +92,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
-private const val ACTION_USB_PERMISSION = "com.neoruben.kobodictmanager.USB_PERMISSION"
+private const val ACTION_USB_PERMISSION = "com.neoruben.kobomanager.USB_PERMISSION"
 
 // Paleta Oficial Rakuten Kobo + E-Ink Carta
 data class KoboPalette(
@@ -193,7 +194,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = palette.bg
                 ) {
-                    KoboDictManagerSingleScreen(
+                    KobodroidSingleScreen(
                         backend = backend,
                         palette = palette,
                         onToggleTheme = {
@@ -208,7 +209,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun KoboDictManagerSingleScreen(
+fun KobodroidSingleScreen(
     backend: KoboBackend,
     palette: KoboPalette,
     onToggleTheme: () -> Unit
@@ -1118,6 +1119,7 @@ private fun TopKoboHeaderBar(
     onLangSelected: (String) -> Unit,
     onToggleTheme: () -> Unit
 ) {
+    val context = LocalContext.current
     var langExpanded by remember { mutableStateOf(false) }
 
     Row(
@@ -1131,11 +1133,11 @@ private fun TopKoboHeaderBar(
                 )
             )
             .border(1.dp, palette.cardBorder, RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        // Marca Kobo con emblema rojo
+        // Marca Kobodroid con emblema rojo
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
@@ -1151,9 +1153,9 @@ private fun TopKoboHeaderBar(
                     fontSize = 16.sp
                 )
             }
-            Spacer(modifier = Modifier.width(9.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Kobo DictManager",
+                text = "Kobodroid",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = palette.textPrimary
@@ -1174,11 +1176,42 @@ private fun TopKoboHeaderBar(
             }
         }
 
-        // Botón Tema E-Ink + Selector de Idioma
+        // Acciones: Botón Ko-fi (permanente y visible) + Tema E-Ink + Selector de Idioma
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+            // Botón Ko-fi de apoyo al proyecto
+            Box(
+                modifier = Modifier
+                    .height(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFFFF5E5B).copy(alpha = 0.16f))
+                    .border(1.dp, Color(0xFFFF5E5B).copy(alpha = 0.7f), RoundedCornerShape(8.dp))
+                    .clickable {
+                        try {
+                            val intent = Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://ko-fi.com/neoruben")
+                            )
+                            context.startActivity(intent)
+                        } catch (_: Exception) {}
+                    }
+                    .padding(horizontal = 7.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = "☕", fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(
+                        text = "Ko-fi",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (palette.isDark) Color(0xFFFF7E70) else Color(0xFFD9383A)
+                    )
+                }
+            }
+
             Box(
                 modifier = Modifier
                     .size(32.dp)
@@ -1200,7 +1233,7 @@ private fun TopKoboHeaderBar(
                         .clip(RoundedCornerShape(8.dp))
                         .background(palette.badgeBg)
                         .clickable { langExpanded = true }
-                        .padding(horizontal = 10.dp),
+                        .padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(

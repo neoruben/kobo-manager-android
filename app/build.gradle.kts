@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.neoruben.kobodictmanager"
+    namespace = "com.neoruben.kobomanager"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.neoruben.kobodictmanager"
+        applicationId = "com.neoruben.kobomanager"
         minSdk = 26
         targetSdk = 35
         versionCode = 4

@@ -1,18 +1,19 @@
-# Kobo DictManager for Android — Guía Técnica y Arquitectura
+# Kobodroid (Kobo Manager for Android) — Guía Técnica y Arquitectura
 
-Este documento resume cómo está construido el proyecto **Kobo DictManager for Android** (`com.neoruben.kobodictmanager`) para poder retomarlo, ampliarlo o depurarlo rápidamente en futuras sesiones.
+Este documento resume cómo está construido el proyecto **Kobodroid** (`com.neoruben.kobomanager`) para poder retomarlo, ampliarlo o depurarlo rápidamente en futuras sesiones.
 
 ---
 
 ## 1. Visión General y Stack
-- **Repositorio:** `https://github.com/neoruben/kobo-dict-manager-android` (privado)
-- **Paquete / Application ID:** `com.neoruben.kobodictmanager`
+- **Repositorio:** `https://github.com/neoruben/kobo-manager-android`
+- **Nombre de la Aplicación:** **Kobodroid**
+- **Paquete / Application ID:** `com.neoruben.kobomanager`
 - **Lenguaje y UI:** Kotlin + Jetpack Compose + Material 3 (`compileSdk = 35`, `minSdk = 26`, `targetSdk = 35`)
 - **Acceso USB:** Acceso directo **USB Mass Storage (BOT / SCSI)** sobre particiones **FAT32** sin depender de `SAF` ni root (`UsbManager` nativo de Android + driver propio).
 - **Compilación local (Windows):**
   - JDK 25 (Android Studio JBR) y Gradle 9.6.0 (`gradlew.bat assembleDebug --offline`).
   - `gradle.properties` incluye `android.overridePathCheck=true` por la tilde en la ruta de usuario.
-  - Al generar APKs para GitHub/Releases, seguir la convención **`v.x.x.x.apk`** (además de `Kobo-DictManager-v.x.x.x.apk`).
+  - Al generar APKs para GitHub/Releases, seguir la convención **`Kobodroid-vX.X.X.apk`** (además de `v.x.x.x.apk`).
 
 ---
 
@@ -22,7 +23,7 @@ Este documento resume cómo está construido el proyecto **Kobo DictManager for 
 app/src/main/
 ├── AndroidManifest.xml                  # Permiso/filtro USB_DEVICE_ATTACHED, orientación portrait
 ├── res/xml/usb_device_filter.xml        # Filtro Vendor ID Kobo (8759 / 0x2237) + Mass Storage BOT (8/6/80)
-└── java/com/neoruben/kobodictmanager/
+└── java/com/neoruben/kobomanager/
     ├── KoboUsbFat32Driver.kt            # Capa física USB BOT/SCSI + sistema de archivos FAT32
     ├── KoboBackend.kt                   # Lógica de negocio Kobo: diccionarios, libros, portadas, SQLite y backups
     ├── MainActivity.kt                  # UI Jetpack Compose (pantalla única, temas Kobo, pestañas Libros/Diccionarios)
@@ -47,8 +48,8 @@ app/src/main/
    - Lee `.kobo/version` para identificar modelo (mapeo `KOBO_MODELS`, ej. `391` / `N365` → `Kobo Clara BW`), firmware y número de serie.
    - Lee `.kobo/Kobo/Kobo eReader.conf` (`CurrentLocale=...`) para determinar el slot de idioma activo (`dicthtml.zip` para inglés, `dicthtml-es.zip` para español, etc.).
 2. **Gestión de Diccionarios:**
-   - Al conectar, hace backup automático del diccionario oficial de fábrica en `filesDir/KoboDictManager/backups/official_<slot>` si es genuino (verificado por `OFFICIAL_FACTORY_SPECS` SHA-256 y ausencia de `Read-Only`).
-   - Auto-importa diccionarios personalizados existentes en `.kobo/dict/<slot>` a la biblioteca local (`filesDir/KoboDictManager/library/` + `catalog.json`) evitando duplicados por SHA-256.
+   - Al conectar, hace backup automático del diccionario oficial de fábrica en `filesDir/Kobodroid/backups/official_<slot>` si es genuino (verificado por `OFFICIAL_FACTORY_SPECS` SHA-256 y ausencia de `Read-Only`).
+   - Auto-importa diccionarios personalizados existentes en `.kobo/dict/<slot>` a la biblioteca local (`filesDir/Kobodroid/library/` + `catalog.json`) evitando duplicados por SHA-256.
    - Al cargar un diccionario personalizado, preserva el anterior si procede, escribe el nuevo en `.kobo/dict/<slot>` y activa `ATTR_READ_ONLY`.
    - Al restaurar el oficial, escribe el backup sin `Read-Only`.
 3. **Gestión de Libros (`listKoboBooks`, `uploadBookToKobo`, `deleteBookFromKobo`):**
@@ -61,22 +62,23 @@ app/src/main/
 ### C. Interfaz de Usuario (`MainActivity.kt`)
 - **Paleta Kobo (`KoboPalette`):** Rojo carmesí oficial (`#CC000F` / `#E60012`) con modo claro **E-Ink Carta** (`#F5F3EE`) y modo oscuro (`#0E1014`).
 - **Estructura sin scroll global:**
-  1. Cabecera con logo `K`, versión (`v1.3.2`), selector de tema (`☀️`/`🌙`) y selector de idioma (`🌐 ES ▾`).
-  2. Tarjeta de estado USB OTG con botones en línea: `➕ Cargar Libros` / `➕ Añadir`, `🔄 Actualizar` / `📁 .kobo/dict`, `⏏️ Expulsar`.
-  3. Barra de pestañas: **`📚 Libros (N)`** y **`📖 Diccionarios`**.
+  1. **Cabecera (`TopKoboHeaderBar`):** Logo `K`, título **Kobodroid**, versión (`v1.3.2`), botón permanente de **Ko-fi** (`☕ Ko-fi`), selector de tema (`☀️`/`🌙`) y selector de idioma (`🌐 ES ▾`).
+  2. **Tarjeta de estado USB OTG:** Botones en línea: `➕ Cargar Libros` / `➕ Añadir`, `🔄 Actualizar` / `📁 .kobo/dict`, `⏏️ Expulsar`.
+  3. **Barra de pestañas:** **`📚 Libros (N)`** y **`📖 Diccionarios`**.
   4. **Pestaña Libros:** Buscador por título, autor o ruta (`🔍`), y lista vertical (`LazyColumn`) con portada, título, `Autor • Tamaño`, ruta completa dentro del eReader (`📁 /carpeta/archivo`) en letra pequeña (`10.sp`) y botón de borrado (`🗑️`) con confirmación que incluye la ruta exacta.
   5. **Pestaña Diccionarios:** Lista unificada (oficial de fábrica + biblioteca local) paginada de 3 en 3 (`◀ 1/N ▶`), sin etiquetas superiores redundantes para que el título se lea completo.
-  6. Barra de estado inferior + diálogos modales de progreso, confirmación, alertas y visor de `.kobo/dict`.
+  6. **Barra de estado inferior:** Estado USB-OTG + diálogos modales de progreso, confirmación, alertas y visor de `.kobo/dict`.
 
 ### D. Idiomas (`Translations.kt`)
 - Traducciones centralizadas en `TRANSLATIONS` y helper `tr(lang, key, args...)`.
 - `SUPPORTED_LANGUAGES` define los idiomas disponibles en el selector.
-- `detectSystemLanguage()` detecta `Locale.getDefault().language`. *(Nota pendiente: si se amplían idiomas, cambiar el fallback de `"es"` a `"en"` y mover los pocos literales sueltos de `MainActivity.kt` como `"Buscar libro o autor..."` a `Translations.kt`).*
+- `detectSystemLanguage()` detecta `Locale.getDefault().language`.
 
 ---
 
 ## 4. Historial de Versiones Relevantes
 - **`v1.2.0` (`fe416c8`):** Versión inicial USB Mass Storage + FAT32 directo, protección Read-Only y gestión de diccionarios en pantalla única.
-- **`v1.3.0` (`afcd130`..`43a65df`):** Renombrado de paquete a `com.neoruben.kobodictmanager`, pestaña de Libros con subida/borrado, portadas EPUB, buscador y fallback SQLite.
+- **`v1.3.0` (`afcd130`..`43a65df`):** Pestaña de Libros con subida/borrado, portadas EPUB, buscador y fallback SQLite.
 - **`v1.3.1` (`e7d8dc2`):** Eliminadas etiquetas superiores redundantes (`FÁBRICA` / `ACTIVO EN KOBO`) en tarjetas de diccionarios para evitar cortes en el título.
 - **`v1.3.2` (`b84b658`):** Añadida ruta completa dentro del eReader (`📁 /carpeta/archivo`) en cada tarjeta de libro, en el buscador y en el diálogo de confirmación de borrado.
+- **Evolución a Kobodroid (`com.neoruben.kobomanager`):** Transición del proyecto a gestor integral Kobo para Android (`kobo-manager-android`), nuevo paquete neutro `com.neoruben.kobomanager`, nombre de aplicación Kobodroid e integración del botón permanente de Ko-fi.
