@@ -13,7 +13,7 @@ Este documento resume cómo está construido el proyecto **Kobodroid** (`com.neo
 - **Compilación local (Windows):**
   - JDK 25 (Android Studio JBR) y Gradle 9.6.0 (`gradlew.bat assembleDebug --offline`).
   - `gradle.properties` incluye `android.overridePathCheck=true` por la tilde en la ruta de usuario.
-  - Al generar APKs para GitHub/Releases, seguir la convención **`Kobodroid-vX.X.X.apk`** (además de `v.x.x.x.apk`).
+  - Al generar APKs para GitHub/Releases, seguir la convención única **`Kobodroid-vX.X.X.apk`**.
 
 ---
 
