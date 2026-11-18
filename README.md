@@ -1,9 +1,11 @@
 # Kobodroid — All-in-One Kobo eReader Manager for Android 📱📚
 
 <p align="center">
-  <a href="https://github.com/neoruben/kobo-manager-android/releases/latest"><img src="https://img.shields.io/badge/⬇_Download_APK-Android-D5001C?style=for-the-badge" alt="Download APK for Android" height="44"></a>
+  <a href="https://github.com/neoruben/kobo-manager-android/releases/latest"><img src="https://img.shields.io/badge/⬇_Download_APK-Android-D5001C?style=for-the-badge" alt="Download APK for Android" height="38"></a>
   &nbsp;
-  <a href="https://ko-fi.com/neoruben"><img src="https://img.shields.io/badge/☕_Support_on_Ko--fi-ff5e5b?style=for-the-badge&logo=kofi&logoColor=white" alt="Support on Ko-fi" height="44"></a>
+  <a href="https://ko-fi.com/neoruben" target="_blank">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi" height="38">
+  </a>
 </p>
 
 **Kobodroid** is an open-source native **Android** application designed to completely manage your **Rakuten Kobo eReader** directly from your phone via a **USB-C / USB OTG** cable, with no computer or Wi-Fi required.
@@ -53,7 +55,9 @@ Transfer books (EPUB, KEPUB, PDF, CBZ), browse your library with book covers and
 If **Kobodroid** is helpful for managing your books and custom dictionaries on your Kobo, you can support its development:
 
 <p align="center">
-  <a href="https://ko-fi.com/neoruben"><img src="https://img.shields.io/badge/☕_Buy_me_a_coffee_on_Ko--fi-ff5e5b?style=for-the-badge&logo=kofi&logoColor=white" alt="Support on Ko-fi" height="44"></a>
+  <a href="https://ko-fi.com/neoruben" target="_blank">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi" height="38">
+  </a>
 </p>
 
 ---
@@ -74,9 +78,11 @@ Developed with ❤️ by [neoruben](https://github.com/neoruben).
 # Kobodroid — Gestor integral para Rakuten Kobo eReader en Android 📱📚
 
 <p align="center">
-  <a href="https://github.com/neoruben/kobo-manager-android/releases/latest"><img src="https://img.shields.io/badge/⬇_Descargar_APK-Android-D5001C?style=for-the-badge" alt="Descargar APK para Android" height="44"></a>
+  <a href="https://github.com/neoruben/kobo-manager-android/releases/latest"><img src="https://img.shields.io/badge/⬇_Descargar_APK-Android-D5001C?style=for-the-badge" alt="Descargar APK para Android" height="38"></a>
   &nbsp;
-  <a href="https://ko-fi.com/neoruben"><img src="https://img.shields.io/badge/☕_Apoyar_en_Ko--fi-ff5e5b?style=for-the-badge&logo=kofi&logoColor=white" alt="Apoyar en Ko-fi" height="44"></a>
+  <a href="https://ko-fi.com/neoruben" target="_blank">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi" height="38">
+  </a>
 </p>
 
 **Kobodroid** es una aplicación nativa para **Android** de código abierto diseñada para gestionar de forma completa tu lector **Rakuten Kobo eReader** directamente desde el móvil mediante un cable **USB-C / USB OTG**, sin necesidad de encender el ordenador ni usar Wi-Fi.
@@ -129,7 +135,9 @@ Permite transferir libros (EPUB, KEPUB, PDF, CBZ), explorar tu biblioteca con po
 Si **Kobodroid** te resulta útil para gestionar tus lecturas y diccionarios en tu Kobo, puedes apoyar su desarrollo:
 
 <p align="center">
-  <a href="https://ko-fi.com/neoruben"><img src="https://img.shields.io/badge/☕_Invitar_a_un_café_en_Ko--fi-ff5e5b?style=for-the-badge&logo=kofi&logoColor=white" alt="Invitar a un café en Ko-fi" height="44"></a>
+  <a href="https://ko-fi.com/neoruben" target="_blank">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi" height="38">
+  </a>
 </p>
 
 ---
